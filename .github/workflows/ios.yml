@@ -14,6 +14,7 @@ jobs:
       - name: Pick simulator
         run: |
           NAME=$(xcrun simctl list devices available | grep -E '^ +iPhone' | head -1 | sed -E 's/^ +(.*) \([0-9A-F-]{36}\).*/\1/')
+          [ -n "$NAME" ] || { echo "no iPhone simulator"; exit 1; }
           echo "Using simulator: $NAME"
           echo "SIM_NAME=$NAME" >> "$GITHUB_ENV"
       - name: Build and test
@@ -33,8 +34,17 @@ jobs:
           BID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           xcrun simctl launch "$UDID" "$BID"
           sleep 5
-          xcrun simctl io "$UDID" screenshot list.png
+          xcrun simctl io "$UDID" screenshot build/list.png
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots
-          path: ios/*.png
+          if-no-files-found: ignore
+          path: ios/build/list.png
+      - name: Upload xcresult on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: ios/build/Logs/Test/*.xcresult
+          if-no-files-found: ignore
