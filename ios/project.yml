@@ -1,0 +1,62 @@
+name: Loop
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    LOOP_BUNDLE_PREFIX: com.example.loop
+    LOOP_APP_GROUP: group.com.example.loop
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+targets:
+  LoopApp:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/LoopApp.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LOOP_APP"
+    dependencies:
+      - target: LoopWidgets
+        embed: true
+  LoopWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app.widgets
+        INFOPLIST_FILE: Widgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widgets/LoopWidgets.entitlements
+        SKIP_INSTALL: YES
+  LoopAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: LoopApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/LoopApp.app/LoopApp
+        BUNDLE_LOADER: $(TEST_HOST)
+schemes:
+  LoopApp:
+    build:
+      targets:
+        LoopApp: all
+        LoopWidgets: all
+        LoopAppTests: [test]
+    test:
+      targets:
+        - LoopAppTests
