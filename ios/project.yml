@@ -8,6 +8,7 @@ settings:
     LOOP_BUNDLE_PREFIX: com.example.loop
     LOOP_APP_GROUP: group.com.example.loop
     SWIFT_VERSION: "5.0"
+    CURRENT_PROJECT_VERSION: "1"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 targets:
   LoopApp:
@@ -24,6 +25,9 @@ targets:
         INFOPLIST_FILE: App/Info.plist
         CODE_SIGN_ENTITLEMENTS: App/LoopApp.entitlements
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LOOP_APP"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CODE_SIGN_STYLE: Automatic
     dependencies:
       - target: LoopWidgets
         embed: true
@@ -43,6 +47,8 @@ targets:
         INFOPLIST_FILE: Widgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: Widgets/LoopWidgets.entitlements
         SKIP_INSTALL: YES
+        MARKETING_VERSION: "1.0"
+        CODE_SIGN_STYLE: Automatic
     dependencies:
       - framework: ../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework
         embed: false
