@@ -66,3 +66,13 @@ data class HabitDetail(
     val currentStreak: Int,
     val bestStreaks: List<StreakDto>
 )
+
+data class ReminderOccurrence(
+    val habitId: Long,
+    val habitName: String,
+    val question: String,
+    val isNumerical: Boolean,
+    val date: String,
+    val hour: Int,
+    val minute: Int
+)

@@ -28,6 +28,7 @@ import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.preferences.WidgetPreferences
+import org.isoron.uhabits.core.reminders.shouldShowReminder
 import org.isoron.uhabits.core.ui.NotificationTray
 import org.isoron.uhabits.core.ui.widgets.WidgetBehavior
 import org.isoron.uhabits.core.ui.views.DarkTheme
@@ -154,6 +155,36 @@ class LoopKit(
             currentStreak = current?.length ?: 0,
             bestStreaks = h.streaks.getBest(10).map { StreakDto(it.start.iso(), it.end.iso(), it.length) }
         )
+    }
+
+    /**
+     * Concrete reminder occurrences from [nowDate] (a calendar date, not the midnight-delayed habit day)
+     * through [horizonDays] days, sorted by (date, hour, minute, habitId), truncated to [maxCount].
+     * Occurrences earlier than or equal to [nowMinuteOfDay] on [nowDate] are skipped. The completion
+     * check uses the habit day at the fire moment (previous calendar day while before the midnight delay).
+     */
+    fun upcomingReminders(nowDate: String, nowMinuteOfDay: Int, horizonDays: Int, maxCount: Int): List<ReminderOccurrence> {
+        refreshToday()
+        val start = parseIso(nowDate)
+        require(nowMinuteOfDay in 0..1439) { "nowMinuteOfDay out of range" }
+        if (horizonDays <= 0 || maxCount <= 0) return emptyList()
+        val delayMinutes = prefs.midnightDelayHours * 60
+        val result = mutableListOf<ReminderOccurrence>()
+        for (offset in 0 until horizonDays) {
+            val d = start.plus(offset)
+            for (h in habitList) {
+                val id = h.id ?: continue
+                val r = h.reminder ?: continue
+                val minuteOfDay = r.hour * 60 + r.minute
+                if (offset == 0 && minuteOfDay <= nowMinuteOfDay) continue
+                val completionDate = if (minuteOfDay < delayMinutes) d.minus(1) else d
+                if (!shouldShowReminder(h, d, completionDate)) continue
+                result.add(ReminderOccurrence(id, h.name, h.question, h.isNumerical, d.iso(), r.hour, r.minute))
+            }
+        }
+        return result
+            .sortedWith(compareBy({ it.date }, { it.hour }, { it.minute }, { it.habitId }))
+            .take(maxCount)
     }
 
     /** 20 RGB ints (0xRRGGBB) for palette indices 0..19. */
