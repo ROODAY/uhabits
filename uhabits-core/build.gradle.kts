@@ -37,6 +37,12 @@ kotlin {
         }
     }
 
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.compilations.getByName("main").cinterops.create("sqlite3") {
+            definitionFile.set(project.file("src/nativeInterop/cinterop/sqlite3.def"))
+        }
+    }
+
     sourceSets {
         val commonMain by getting {
             dependencies {
@@ -106,4 +112,13 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
 
 tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+// Canvas-dependent tests need a real Canvas, which the iOS port does not provide
+// (rendering is done natively in SwiftUI).
+tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest>().configureEach {
+    environment("SIMCTL_CHILD_LOOP_TEST_ASSETS", "${projectDir}/assets")
+    filter.excludeTestsMatching("*CanvasTest")
+    filter.excludeTestsMatching("*BarChartTest")
+    filter.excludeTestsMatching("*HistoryChartTest")
 }
