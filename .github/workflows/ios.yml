@@ -17,6 +17,12 @@ jobs:
           path: ~/.konan
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-${{ runner.os }}-
+      - name: Toolchain info
+        run: |
+          xcodebuild -version
+          ls /Applications | grep -i xcode
+          sw_vers
+          xcodebuild -showsdks | grep -i ios
       - name: Build LoopKit XCFramework
         run: ./gradlew :uhabits-ios-kit:assembleLoopKitReleaseXCFramework --no-daemon
       - name: Install XcodeGen
