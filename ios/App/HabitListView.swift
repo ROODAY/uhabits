@@ -30,6 +30,15 @@ final class HabitListModel: ObservableObject {
 
     private var midnightTimer: Timer?
     private var started = false
+    private let store: LoopStore
+    /// Serializes lifecycle work (R-T12a): each activate/deactivate/refresh awaits the previous one.
+    private var chain: Task<Void, Never>?
+    /// False while the app is in the background; refresh() is then a no-op so the DB stays closed.
+    private(set) var isActive = false
+
+    init(store: LoopStore = .shared) {
+        self.store = store
+    }
 
     func start() {
         guard !started else { return }
@@ -42,30 +51,55 @@ final class HabitListModel: ObservableObject {
         }
     }
 
+    private func enqueue(_ work: @escaping @MainActor () async -> Void) async {
+        let previous = chain
+        let task = Task { @MainActor in
+            await previous?.value
+            await work()
+        }
+        chain = task
+        await task.value
+    }
+
     /// Called when the app becomes active.
     func activate(seedDemo: Bool) async {
-        start()
-        do {
-            if seedDemo { try await DemoSeed.seedIfEmpty(LoopStore.shared) }
-            try await LoopStore.shared.reload()
-        } catch { report(error) }
-        await refresh()
+        await enqueue { [self] in
+            isActive = true
+            start()
+            do {
+                if seedDemo { try await DemoSeed.seedIfEmpty(store) }
+                try await store.reload()
+            } catch { report(error) }
+            await performRefresh()
+        }
     }
 
     func deactivate() async {
-        midnightTimer?.invalidate()
-        midnightTimer = nil
-        await LoopStore.shared.close()
+        isActive = false
+        await enqueue { [self] in
+            midnightTimer?.invalidate()
+            midnightTimer = nil
+            // A later activate may already have run; only close if still inactive.
+            if !isActive { await store.close() }
+        }
     }
 
     func retry() async {
-        do { try await LoopStore.shared.reload() } catch { report(error) }
-        await refresh()
+        await enqueue { [self] in
+            do { try await store.reload() } catch { report(error) }
+            await performRefresh()
+        }
     }
 
     func refresh() async {
+        guard isActive else { return }
+        await enqueue { [self] in await performRefresh() }
+    }
+
+    private func performRefresh() async {
+        guard isActive else { return }
         do {
-            let r = try await LoopStore.shared.withKit { kit in
+            let r = try await store.withKit { kit in
                 (try kit.listHabits(dayCount: 5, includeArchived: false),
                  try kit.palette(dark: false).map { Int(truncating: $0) },
                  try kit.palette(dark: true).map { Int(truncating: $0) },
@@ -95,7 +129,7 @@ final class HabitListModel: ObservableObject {
     }
 
     private func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
-        do { try await LoopStore.shared.mutate(body) } catch { report(error) }
+        do { try await store.mutate(body) } catch { report(error) }
         await refresh()
     }
 
@@ -126,6 +160,9 @@ struct HabitListView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var sheet: ListSheet?
     @State private var path: [Route] = []
+    @State private var launchHandled = false
+    /// Value of the --screen launch argument (CI screenshots).
+    var launchScreen: String?
 
     private var palette: [Int] { scheme == .dark ? model.darkPalette : model.lightPalette }
 
@@ -151,10 +188,16 @@ struct HabitListView: View {
             }
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                case .edit: Text("Edit — coming soon")
+                case .edit(let id):
+                    HabitEditView(habitId: id, onDone: { Task { await model.refresh() } })
                 case .detail: Text("Detail — coming soon")
                 }
             }
+        }
+        .onChange(of: model.loaded, initial: true) { _, isLoaded in
+            guard isLoaded, !launchHandled, launchScreen == "edit", let first = model.rows.first else { return }
+            launchHandled = true
+            path.append(.edit(first.id))
         }
         .sheet(item: $sheet) { s in
             switch s {

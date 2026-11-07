@@ -52,7 +52,9 @@ jobs:
         with:
           name: screenshots
           if-no-files-found: ignore
-          path: ios/build/list.png
+          path: |
+            ios/build/list.png
+            ios/build/edit.png
       - name: Upload xcresult on failure
         if: failure()
         uses: actions/upload-artifact@v4

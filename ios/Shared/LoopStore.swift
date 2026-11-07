@@ -24,6 +24,8 @@ actor LoopStore {
         self.keyValueStore = keyValueStore
     }
 
+    var isOpen: Bool { kit != nil }
+
     func setAfterMutation(_ hook: @escaping @Sendable () async -> Void) {
         afterMutation = hook
     }
