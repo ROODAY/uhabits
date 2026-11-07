@@ -12,11 +12,15 @@ import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.DATABASE_VERSION
 import org.isoron.uhabits.core.commands.CommandRunner
+import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.models.Entry
+import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.preferences.WidgetPreferences
+import org.isoron.uhabits.core.ui.NotificationTray
+import org.isoron.uhabits.core.ui.widgets.WidgetBehavior
 import org.isoron.uhabits.core.ui.views.DarkTheme
 import org.isoron.uhabits.core.ui.views.LightTheme
 import org.isoron.uhabits.core.ui.views.Theme
@@ -48,6 +52,8 @@ class LoopKit(
         private set
     internal lateinit var commandRunner: CommandRunner
         private set
+
+    private lateinit var widgetBehavior: WidgetBehavior
 
     private var lastToday: LocalDate? = null
     private var loaded = false
@@ -137,6 +143,39 @@ class LoopKit(
         return prefs.areQuestionMarksEnabled
     }
 
+    private fun mutate(habitId: Long, date: String, requireNumerical: Boolean?, block: (Habit, LocalDate) -> Unit) {
+        refreshToday()
+        val d = parseIso(date)
+        val habit = habitList.getById(habitId) ?: return
+        if (requireNumerical != null && habit.isNumerical != requireNumerical) return
+        block(habit, d)
+    }
+
+    /** Cycles a yes/no entry using the user's skip / question-mark preferences. */
+    fun toggle(habitId: Long, date: String) =
+        mutate(habitId, date, false) { h, d -> widgetBehavior.onToggleRepetition(h, d) }
+
+    /** Marks a yes/no entry as done (YES_MANUAL). */
+    fun markDone(habitId: Long, date: String) =
+        mutate(habitId, date, false) { h, d -> widgetBehavior.onAddRepetition(h, d) }
+
+    fun increment(habitId: Long, date: String) =
+        mutate(habitId, date, true) { h, d -> widgetBehavior.onIncrement(h, d, 1000) }
+
+    fun decrement(habitId: Long, date: String) =
+        mutate(habitId, date, true) { h, d -> widgetBehavior.onDecrement(h, d, 1000) }
+
+    fun setNumber(habitId: Long, date: String, value: Double, notes: String) =
+        mutate(habitId, date, true) { h, d ->
+            widgetBehavior.setValue(h, d, (value * 1000).roundToInt(), notes)
+        }
+
+    fun setNotes(habitId: Long, date: String, notes: String) =
+        mutate(habitId, date, null) { h, d ->
+            val current = h.originalEntries.get(d).value
+            commandRunner.run(CreateRepetitionCommand(habitList, h, d, current, notes))
+        }
+
     private fun load() {
         loaded = false
         val db = databaseOpener.open(dbPath)
@@ -159,6 +198,7 @@ class LoopKit(
         prefs = Preferences(storage)
         widgetPrefs = WidgetPreferences(storage)
         commandRunner = CommandRunner(SyncTaskRunner())
+        widgetBehavior = WidgetBehavior(habitList, commandRunner, NoOpNotificationTray(commandRunner, prefs), prefs)
         lastToday = null
         loaded = true
     }
@@ -175,4 +215,16 @@ class LoopKit(
         }
         return today
     }
+}
+
+private class NoOpSystemTray : NotificationTray.SystemTray {
+    override fun removeNotification(notificationId: Int) {}
+    override fun showNotification(habit: Habit, notificationId: Int, date: LocalDate, reminderTime: Long) {}
+    override fun log(msg: String) {}
+}
+
+/** iOS notification cancelling is handled in Swift. */
+private class NoOpNotificationTray(commandRunner: CommandRunner, prefs: Preferences) :
+    NotificationTray(SyncTaskRunner(), commandRunner, prefs, NoOpSystemTray()) {
+    override fun cancel(habit: Habit) {}
 }

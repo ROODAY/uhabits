@@ -15,5 +15,7 @@ internal fun parseIso(s: String): LocalDate {
     val m = parts[1].toIntOrNull()
     val d = parts[2].toIntOrNull()
     require(y != null && m != null && d != null && m in 1..12 && d in 1..31) { "Invalid ISO date: $s" }
-    return LocalDate(y, m, d)
+    val result = LocalDate(y, m, d)
+    require(result.iso() == s) { "Invalid ISO date: $s" }
+    return result
 }
