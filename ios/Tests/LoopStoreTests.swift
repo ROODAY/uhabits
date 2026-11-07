@@ -31,7 +31,7 @@ final class LoopStoreTests: XCTestCase {
         await store.open()
         let id = try await store.withKit { try $0.createHabit(input: input("Read")) }
         let today = try await store.withKit { try $0.today() }
-        try await store.mutate { try $0.toggle(habitId: id.int64Value, date: today) }
+        try await store.mutate { try $0.toggle(habitId: id, date: today) }
         let rows = try await store.withKit { try $0.listHabits(dayCount: 5, includeArchived: false) }
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].name, "Read")
@@ -48,7 +48,7 @@ final class LoopStoreTests: XCTestCase {
         let id = try await a.withKit { try $0.createHabit(input: input("Run")) }
         await b.open()
         let today = try await a.withKit { try $0.today() }
-        try await a.mutate { try $0.toggle(habitId: id.int64Value, date: today) }
+        try await a.mutate { try $0.toggle(habitId: id, date: today) }
         await b.reload()
         let rows = try await b.withKit { try $0.listHabits(dayCount: 1, includeArchived: false) }
         XCTAssertEqual(rows.count, 1)
