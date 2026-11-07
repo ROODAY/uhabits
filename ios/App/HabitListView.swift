@@ -194,7 +194,8 @@ struct HabitListView: View {
                 switch route {
                 case .edit(let id):
                     HabitEditView(habitId: id, onDone: { Task { await model.refresh() } })
-                case .detail: Text("Detail — coming soon")
+                case .detail(let id):
+                    HabitDetailView(habitId: id, listModel: model, onEdit: { path.append(.edit($0)) })
                 }
             }
         }
