@@ -26,8 +26,8 @@ import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.models.Habit
-import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.reminders.shouldShowReminder
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
 
@@ -109,30 +109,18 @@ open class NotificationTray(
     internal class NotificationData(val date: LocalDate, val reminderTime: Long)
     private inner class ShowNotificationTask(private val habit: Habit, data: NotificationData) :
         Task {
-        var isCompleted = false
         private val date: LocalDate = data.date
         private val reminderTime: Long = data.reminderTime
 
         override suspend fun doInBackground() {
-            isCompleted = habit.isCompletedToday()
+            // Warm up computed entries off the main thread before the check.
+            habit.isCompletedOn(date)
         }
 
         override fun onPostExecute() {
             systemTray.log("Showing notification for habit=" + habit.id)
-            if (isCompleted && habit.targetType != NumericalHabitType.AT_MOST) {
-                systemTray.log("Habit ${habit.id} already checked. Skipping.")
-                return
-            }
-            if (!habit.hasReminder()) {
-                systemTray.log("Habit ${habit.id} does not have a reminder. Skipping.")
-                return
-            }
-            if (habit.isArchived) {
-                systemTray.log("Habit ${habit.id} is archived. Skipping.")
-                return
-            }
-            if (!shouldShowReminderToday()) {
-                systemTray.log("Habit ${habit.id} not supposed to run today. Skipping.")
+            if (!shouldShowReminder(habit, date)) {
+                systemTray.log("Habit ${habit.id} should not be reminded on $date. Skipping.")
                 return
             }
             systemTray.showNotification(
@@ -141,14 +129,6 @@ open class NotificationTray(
                 date,
                 reminderTime
             )
-        }
-
-        private fun shouldShowReminderToday(): Boolean {
-            if (!habit.hasReminder()) return false
-            val reminder = habit.reminder
-            val reminderDays = reminder!!.days.toArray()
-            val weekday = (date.dayOfWeek.daysSinceSunday + 1) % 7
-            return reminderDays[weekday]
         }
     }
 
