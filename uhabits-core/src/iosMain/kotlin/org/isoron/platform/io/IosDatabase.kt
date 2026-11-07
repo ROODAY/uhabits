@@ -14,6 +14,8 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
+import cnames.structs.sqlite3 as Sqlite3Db
+import cnames.structs.sqlite3_stmt as Sqlite3Stmt
 import platform.Foundation.NSFileManager
 import sqlite3.SQLITE_DONE
 import sqlite3.SQLITE_NULL
@@ -23,7 +25,6 @@ import sqlite3.SQLITE_OPEN_FULLMUTEX
 import sqlite3.SQLITE_OPEN_READWRITE
 import sqlite3.SQLITE_ROW
 import sqlite3.SQLITE_TRANSIENT
-import sqlite3.sqlite3
 import sqlite3.sqlite3_bind_double
 import sqlite3.sqlite3_bind_int
 import sqlite3.sqlite3_bind_int64
@@ -41,9 +42,8 @@ import sqlite3.sqlite3_open_v2
 import sqlite3.sqlite3_prepare_v2
 import sqlite3.sqlite3_reset
 import sqlite3.sqlite3_step
-import sqlite3.sqlite3_stmt
 
-private fun sqliteError(db: CPointer<sqlite3>?, what: String, code: Int): Exception {
+private fun sqliteError(db: CPointer<Sqlite3Db>?, what: String, code: Int): Exception {
     val msg = if (db != null) sqlite3_errmsg(db)?.toKString() else null
     return Exception("$what failed (code $code): $msg")
 }
@@ -62,7 +62,7 @@ class IosDatabaseOpener : DatabaseOpener {
             }
         }
 
-        val dbVar = alloc<CPointerVar<sqlite3>>()
+        val dbVar = alloc<CPointerVar<Sqlite3Db>>()
         val flags = SQLITE_OPEN_READWRITE or SQLITE_OPEN_CREATE or SQLITE_OPEN_FULLMUTEX
         val result = sqlite3_open_v2(path, dbVar.ptr, flags, null)
         val db = dbVar.value
@@ -79,10 +79,10 @@ class IosDatabaseOpener : DatabaseOpener {
     }
 }
 
-class IosDatabase(val db: CPointer<sqlite3>) : Database {
+class IosDatabase(val db: CPointer<Sqlite3Db>) : Database {
     override fun prepareStatement(sql: String): PreparedStatement = memScoped {
         if (sql.isEmpty()) throw Exception("empty SQL query")
-        val stmt = alloc<CPointerVar<sqlite3_stmt>>()
+        val stmt = alloc<CPointerVar<Sqlite3Stmt>>()
         val result = sqlite3_prepare_v2(db, sql.cstr.ptr, -1, stmt.ptr, null)
         if (result != SQLITE_OK) throw sqliteError(db, "sqlite3_prepare_v2", result)
         IosPreparedStatement(db, stmt.value!!)
@@ -94,8 +94,8 @@ class IosDatabase(val db: CPointer<sqlite3>) : Database {
 }
 
 class IosPreparedStatement(
-    private val db: CPointer<sqlite3>,
-    private val stmt: CPointer<sqlite3_stmt>
+    private val db: CPointer<Sqlite3Db>,
+    private val stmt: CPointer<Sqlite3Stmt>
 ) : PreparedStatement {
     override fun step(): StepResult {
         val code = sqlite3_step(stmt)
