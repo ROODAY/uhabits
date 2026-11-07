@@ -31,6 +31,7 @@ import sqlite3.sqlite3_bind_int64
 import sqlite3.sqlite3_bind_null
 import sqlite3.sqlite3_bind_text
 import sqlite3.sqlite3_close
+import sqlite3.sqlite3_close_v2
 import sqlite3.sqlite3_column_double
 import sqlite3.sqlite3_column_int
 import sqlite3.sqlite3_column_int64
@@ -89,7 +90,8 @@ class IosDatabase(val db: CPointer<Sqlite3Db>) : Database {
     }
 
     override fun close() {
-        sqlite3_close(db)
+        val result = sqlite3_close_v2(db)
+        if (result != SQLITE_OK) throw Exception("sqlite3_close_v2 failed (code $result)")
     }
 }
 

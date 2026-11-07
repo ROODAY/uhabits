@@ -12,4 +12,4 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :uhabits-core:jvmTest :uhabits-core:jsTest :uhabits-android:testDebugUnitTest :uhabits-android:assembleDebug
+      - run: ./gradlew :uhabits-core:jvmTest :uhabits-core:jsTest :uhabits-ios-kit:jvmTest :uhabits-android:testDebugUnitTest :uhabits-android:assembleDebug
