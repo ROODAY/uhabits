@@ -44,8 +44,8 @@ jobs:
           APP=$(find build/Build/Products -maxdepth 2 -name LoopApp.app | head -1)
           xcrun simctl install "$UDID" "$APP"
           BID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
-          xcrun simctl launch "$UDID" "$BID"
-          sleep 5
+          xcrun simctl launch "$UDID" "$BID" --seed-demo --screen list
+          sleep 20
           xcrun simctl io "$UDID" screenshot build/list.png
       - uses: actions/upload-artifact@v4
         if: always()
