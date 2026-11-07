@@ -69,8 +69,8 @@ final class HabitListModel: ObservableObject {
                 (try kit.listHabits(dayCount: 5, includeArchived: false),
                  try kit.palette(dark: false).map { Int(truncating: $0) },
                  try kit.palette(dark: true).map { Int(truncating: $0) },
-                 try kit.areQuestionMarksEnabled().boolValue,
-                 Int(truncating: try kit.midnightDelayHours()))
+                 try kit.areQuestionMarksEnabled(),
+                 Int(try kit.midnightDelayHours()))
             }
             rows = r.0
             lightPalette = r.1
