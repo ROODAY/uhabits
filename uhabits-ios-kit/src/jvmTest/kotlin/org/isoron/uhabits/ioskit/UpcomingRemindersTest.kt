@@ -135,4 +135,49 @@ class UpcomingRemindersTest {
         assertFailsWith<IllegalArgumentException> { kit.upcomingReminders(todayIso, 1440, 5, 5) }
         kit.close()
     }
+
+    private fun periodInput(numerical: Boolean, num: Int, den: Int) = HabitInput(
+        name = "P", question = "Did P?", description = "", colorIndex = 3,
+        isNumerical = numerical, unit = if (numerical) "km" else "", targetValue = if (numerical) 20.0 else 0.0,
+        targetType = 0, freqNumerator = num, freqDenominator = den,
+        reminder = ReminderDto(9, 0, List(7) { true })
+    )
+
+    @Test
+    fun weeklyNumerical_metEarlierInPeriod_suppressesRestOfPeriodOnly() {
+        val wednesday = LocalDate(2015, 1, 28)
+        val (kit, _) = testKit(tmp(), wednesday)
+        val id = kit.createHabit(periodInput(numerical = true, num = 1, den = 7))
+        val before = kit.upcomingReminders("2015-01-28", 0, 7, 20).map { it.date }
+        assertTrue("2015-01-29" in before && "2015-01-31" in before)
+
+        kit.setNumber(id, "2015-01-28", 20.0, "")
+        val after = kit.upcomingReminders("2015-01-28", 0, 7, 20).map { it.date }
+        // Rest of the current week is suppressed; the next week (starts Feb 1 or Feb 2) is not.
+        assertTrue(after.none { it < "2015-02-01" }, "got $after")
+        assertTrue("2015-02-02" in after && "2015-02-03" in after, "got $after")
+        kit.close()
+    }
+
+    @Test
+    fun weeklyNumerical_notMet_keepsReminders() {
+        val (kit, _) = testKit(tmp(), LocalDate(2015, 1, 28))
+        val id = kit.createHabit(periodInput(numerical = true, num = 1, den = 7))
+        kit.setNumber(id, "2015-01-28", 5.0, "")
+        val dates = kit.upcomingReminders("2015-01-28", 0, 4, 20).map { it.date }
+        assertEquals(listOf("2015-01-28", "2015-01-29", "2015-01-30", "2015-01-31"), dates)
+        kit.close()
+    }
+
+    @Test
+    fun threePerWeekYesNo_metEarlierInPeriod_suppressesFollowingDays() {
+        val (kit, _) = testKit(tmp(), LocalDate(2015, 1, 28))
+        val id = kit.createHabit(periodInput(numerical = false, num = 3, den = 7))
+        val before = kit.upcomingReminders("2015-01-28", 0, 4, 20).map { it.date }
+        assertTrue("2015-01-29" in before && "2015-01-30" in before)
+        for (d in listOf("2015-01-26", "2015-01-27", "2015-01-28")) kit.markDone(id, d)
+        val after = kit.upcomingReminders("2015-01-28", 0, 4, 20).map { it.date }
+        assertTrue("2015-01-29" !in after && "2015-01-30" !in after, "got $after")
+        kit.close()
+    }
 }

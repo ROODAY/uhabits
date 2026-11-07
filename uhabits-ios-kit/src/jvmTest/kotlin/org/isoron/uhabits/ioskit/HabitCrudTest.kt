@@ -156,4 +156,18 @@ class HabitCrudTest {
         assertFailsWith<IllegalArgumentException> { kit.createHabit(input().copy(colorIndex = 20)) }
         kit.close()
     }
+
+    @Test
+    fun create_nonFiniteOrHugeTarget_throws() {
+        val (kit, _) = testKit(tmp())
+        for (bad in listOf(Double.POSITIVE_INFINITY, Double.NaN, 1e30, 1e9 + 1)) {
+            assertFailsWith<IllegalArgumentException> { kit.createHabit(input(numerical = true).copy(targetValue = bad)) }
+        }
+        val id = kit.createHabit(input(numerical = true).copy(targetValue = 1e9))
+        assertFailsWith<IllegalArgumentException> {
+            kit.editHabit(id, input(numerical = true).copy(targetValue = Double.POSITIVE_INFINITY))
+        }
+        assertEquals(1e9, kit.habitInput(id)!!.targetValue)
+        kit.close()
+    }
 }

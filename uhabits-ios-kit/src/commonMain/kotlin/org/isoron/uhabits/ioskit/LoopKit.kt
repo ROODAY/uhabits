@@ -8,6 +8,7 @@ import org.isoron.platform.io.migrateTo
 import org.isoron.platform.io.setVersion
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.computeToday
+import org.isoron.platform.time.getFirstWeekday
 import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.DATABASE_VERSION
@@ -39,6 +40,9 @@ import kotlin.math.roundToInt
 fun interface TodaySource {
     fun today(midnightDelayHours: Int): LocalDate
 }
+
+/** Largest accepted numerical target, keeping the x1000 raw values and Swift formatting in range. */
+internal const val MAX_TARGET_VALUE = 1e9
 
 /**
  * Facade over the habit core. NOT thread-safe: callers (the Swift actor) must
@@ -169,7 +173,7 @@ class LoopKit @Throws(Exception::class) constructor(
      */
     @Throws(Exception::class)
     fun upcomingReminders(nowDate: String, nowMinuteOfDay: Int, horizonDays: Int, maxCount: Int): List<ReminderOccurrence> {
-        refreshToday()
+        val today = refreshToday()
         val start = parseIso(nowDate)
         require(nowMinuteOfDay in 0..1439) { "nowMinuteOfDay out of range" }
         if (horizonDays <= 0 || maxCount <= 0) return emptyList()
@@ -183,7 +187,14 @@ class LoopKit @Throws(Exception::class) constructor(
                 val minuteOfDay = r.hour * 60 + r.minute
                 if (offset == 0 && minuteOfDay <= nowMinuteOfDay) continue
                 val completionDate = if (minuteOfDay < delayMinutes) d.minus(1) else d
-                if (!shouldShowReminder(h, d, completionDate)) continue
+                // Measurable habits with a period target (e.g. 20 per week) are completed per period. The
+                // core only evaluates today's period, so for a later day in that same period use today's
+                // completion, as Android does when it re-checks at fire time.
+                val checkDate = if (h.isNumerical && h.frequency.denominator > 1 && completionDate > today &&
+                    h.computedEntries.periodStart(completionDate, getFirstWeekday(), h.frequency) ==
+                    h.computedEntries.periodStart(today, getFirstWeekday(), h.frequency)
+                ) today else completionDate
+                if (!shouldShowReminder(h, d, checkDate)) continue
                 result.add(ReminderOccurrence(id, h.name, h.question, h.isNumerical, d.iso(), r.hour, r.minute))
             }
         }
@@ -248,6 +259,7 @@ class LoopKit @Throws(Exception::class) constructor(
     @Throws(Exception::class)
     fun setNumber(habitId: Long, date: String, value: Double, notes: String) =
         mutate(habitId, date, true) { h, d ->
+            require(value.isFinite()) { "value must be finite" }
             widgetBehavior.setValue(h, d, (value * 1000).roundToInt(), notes)
         }
 
@@ -317,7 +329,9 @@ class LoopKit @Throws(Exception::class) constructor(
         require(input.freqDenominator >= input.freqNumerator) { "frequency denominator must be >= numerator" }
         require(input.colorIndex in 0..19) { "colorIndex out of range" }
         if (input.isNumerical) {
-            require(input.targetValue >= 0) { "targetValue must be >= 0" }
+            require(input.targetValue.isFinite() && input.targetValue >= 0 && input.targetValue <= MAX_TARGET_VALUE) {
+                "targetValue must be finite and between 0 and $MAX_TARGET_VALUE"
+            }
             require(input.targetType == NumericalHabitType.AT_LEAST.value || input.targetType == NumericalHabitType.AT_MOST.value) {
                 "invalid targetType"
             }

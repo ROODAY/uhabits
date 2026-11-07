@@ -185,7 +185,8 @@ open class EntryList {
         }
     }
 
-    private fun periodStart(date: LocalDate, firstWeekday: DayOfWeek, frequency: Frequency): LocalDate = when {
+    /** First day of the completion period containing [date]: the day, week or month, depending on the frequency. */
+    fun periodStart(date: LocalDate, firstWeekday: DayOfWeek, frequency: Frequency): LocalDate = when {
         frequency.denominator <= 1 -> date
         frequency.denominator <= 7 -> date.startOfWeek(firstWeekday)
         else -> date.startOfMonth()

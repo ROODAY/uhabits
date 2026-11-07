@@ -158,4 +158,13 @@ class EntryMutationsTest {
         assertFailsWith<IllegalArgumentException> { parseIso("2015-13-01") }
         assertEquals(LocalDate(2024, 2, 29), parseIso("2024-02-29"))
     }
+
+    @Test
+    fun setNumber_nonFinite_throws() {
+        val (kit, _) = testKit(tmp())
+        val h = addHabit(kit, numerical = true)
+        assertFailsWith<IllegalArgumentException> { kit.setNumber(h.id!!, day, Double.POSITIVE_INFINITY, "") }
+        assertFailsWith<IllegalArgumentException> { kit.setNumber(h.id!!, day, Double.NaN, "") }
+        kit.close()
+    }
 }
