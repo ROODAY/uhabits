@@ -50,3 +50,19 @@ data class HabitInput(
     val freqDenominator: Int,
     val reminder: ReminderDto?
 )
+
+data class StreakDto(
+    val start: String,
+    val end: String,
+    val length: Int
+)
+
+data class HabitDetail(
+    val row: HabitRow,
+    val description: String,
+    val freqNumerator: Int,
+    val freqDenominator: Int,
+    val reminder: ReminderDto?,
+    val currentStreak: Int,
+    val bestStreaks: List<StreakDto>
+)

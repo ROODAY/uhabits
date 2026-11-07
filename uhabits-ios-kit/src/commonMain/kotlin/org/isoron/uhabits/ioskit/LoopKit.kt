@@ -91,42 +91,69 @@ class LoopKit(
         return habitList
             .filter { includeArchived || !it.isArchived }
             .sortedBy { it.position }
-            .map { h ->
-                val days = (0 until maxOf(dayCount, 0)).map { i ->
-                    val date = today.minus(i)
-                    val e = h.computedEntries.get(date)
-                    val raw = e.value
-                    val value = if (h.isNumerical) {
-                        maxOf(raw, 0) / 1000.0
-                    } else if (raw == Entry.YES_AUTO || raw == Entry.YES_MANUAL) {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                    DayCell(
-                        date = date.iso(),
-                        rawValue = raw,
-                        value = value,
-                        isCompleted = h.isCompletedOn(date),
-                        notes = h.originalEntries.get(date).notes
-                    )
-                }
-                HabitRow(
-                    id = h.id!!,
-                    name = h.name,
-                    question = h.question,
-                    colorIndex = h.color.paletteIndex,
-                    isNumerical = h.isNumerical,
-                    unit = h.unit,
-                    targetValue = h.targetValue,
-                    targetType = h.targetType.value,
-                    isArchived = h.isArchived,
-                    score = h.scores[today].value,
-                    isCompletedToday = h.isCompletedOn(today),
-                    today = today.iso(),
-                    days = days
-                )
+            .map { h -> buildRow(h, today, dayCount) }
+    }
+
+    private fun buildRow(h: Habit, today: LocalDate, dayCount: Int): HabitRow {
+        val days = (0 until maxOf(dayCount, 0)).map { i ->
+            val date = today.minus(i)
+            val raw = h.computedEntries.get(date).value
+            val value = if (h.isNumerical) {
+                maxOf(raw, 0) / 1000.0
+            } else if (raw == Entry.YES_AUTO || raw == Entry.YES_MANUAL) {
+                1.0
+            } else {
+                0.0
             }
+            DayCell(
+                date = date.iso(),
+                rawValue = raw,
+                value = value,
+                isCompleted = h.isCompletedOn(date),
+                notes = h.originalEntries.get(date).notes
+            )
+        }
+        return HabitRow(
+            id = h.id!!,
+            name = h.name,
+            question = h.question,
+            colorIndex = h.color.paletteIndex,
+            isNumerical = h.isNumerical,
+            unit = h.unit,
+            targetValue = h.targetValue,
+            targetType = h.targetType.value,
+            isArchived = h.isArchived,
+            score = h.scores[today].value,
+            isCompletedToday = h.isCompletedOn(today),
+            today = today.iso(),
+            days = days
+        )
+    }
+
+    private fun reminderDto(h: Habit): ReminderDto? = h.reminder?.let { r ->
+        val packed = r.days.toArray()
+        ReminderDto(r.hour, r.minute, List(7) { i -> packed[(i + 1) % 7] })
+    }
+
+    /**
+     * Detail for one habit, or null if it does not exist. `row.days` covers [historyDays] days.
+     * `currentStreak` is the length of the streak ending today or yesterday, else 0.
+     */
+    fun habitDetail(habitId: Long, historyDays: Int): HabitDetail? {
+        val today = refreshToday()
+        val h = habitList.getById(habitId) ?: return null
+        val yesterday = today.minus(1)
+        val current = h.streaks.getBest(Int.MAX_VALUE)
+            .firstOrNull { it.end == today || it.end == yesterday }
+        return HabitDetail(
+            row = buildRow(h, today, historyDays),
+            description = h.description,
+            freqNumerator = h.frequency.numerator,
+            freqDenominator = h.frequency.denominator,
+            reminder = reminderDto(h),
+            currentStreak = current?.length ?: 0,
+            bestStreaks = h.streaks.getBest(10).map { StreakDto(it.start.iso(), it.end.iso(), it.length) }
+        )
     }
 
     /** 20 RGB ints (0xRRGGBB) for palette indices 0..19. */
@@ -230,10 +257,7 @@ class LoopKit(
             targetType = h.targetType.value,
             freqNumerator = h.frequency.numerator,
             freqDenominator = h.frequency.denominator,
-            reminder = h.reminder?.let { r ->
-                val packed = r.days.toArray()
-                ReminderDto(r.hour, r.minute, List(7) { i -> packed[(i + 1) % 7] })
-            }
+            reminder = reminderDto(h)
         )
     }
 
