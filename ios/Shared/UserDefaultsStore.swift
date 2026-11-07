@@ -4,9 +4,11 @@ import LoopKit
 /// Backs the Kotlin preferences with UserDefaults.
 final class UserDefaultsStore: NSObject, KeyValueStore {
     private let defaults: UserDefaults
+    private let suiteName: String?
 
-    init(defaults: UserDefaults = AppGroup.defaults) {
+    init(defaults: UserDefaults = AppGroup.defaults, suiteName: String? = AppGroup.id) {
         self.defaults = defaults
+        self.suiteName = suiteName
     }
 
     func getString(key: String) -> String? {
@@ -22,8 +24,10 @@ final class UserDefaultsStore: NSObject, KeyValueStore {
     }
 
     func clear() {
-        for key in defaults.dictionaryRepresentation().keys {
-            defaults.removeObject(forKey: key)
+        if let suiteName {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        } else {
+            for key in defaults.dictionaryRepresentation().keys { defaults.removeObject(forKey: key) }
         }
     }
 }

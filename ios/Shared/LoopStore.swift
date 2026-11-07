@@ -2,6 +2,10 @@ import Foundation
 import LoopKit
 import WidgetKit
 
+enum LoopStoreError: Error, Equatable {
+    case openFailed(String)
+}
+
 /// The single owner of the Kotlin LoopKit in this process. All facade calls go through it.
 actor LoopStore {
     static let shared = LoopStore()
@@ -24,12 +28,12 @@ actor LoopStore {
         afterMutation = hook
     }
 
-    func open() {
+    func open() throws {
         guard kit == nil else { return }
         do {
             kit = try LoopKitFactoryKt.createLoopKit(dbPath: dbPath, resourcesPath: resourcesPath, store: keyValueStore)
         } catch {
-            fatalError("LoopKit open failed: \(error)")
+            throw LoopStoreError.openFailed(String(describing: error))
         }
     }
 
@@ -40,25 +44,24 @@ actor LoopStore {
     }
 
     /// Re-reads the database, picking up writes from other processes.
-    func reload() {
+    func reload() throws {
         if let k = kit {
-            do { try k.reload() } catch { kit = nil; open() }
+            do { try k.reload() } catch { kit = nil; try open() }
         } else {
-            open()
+            try open()
         }
     }
 
-    func withKit<T>(_ body: (LoopKit) throws -> T) rethrows -> T {
-        if kit == nil { open() }
+    func withKit<T>(_ body: (LoopKit) throws -> T) throws -> T {
+        if kit == nil { try open() }
         return try body(kit!)
     }
 
-    func mutate(_ body: (LoopKit) throws -> Void) rethrows {
-        if kit == nil { open() }
+    func mutate(_ body: (LoopKit) throws -> Void) async throws {
+        if kit == nil { try open() }
         try body(kit!)
         ChangeSignal.post()
         WidgetCenter.shared.reloadAllTimelines()
-        let hook = afterMutation
-        Task { await hook() }
+        await afterMutation()
     }
 }

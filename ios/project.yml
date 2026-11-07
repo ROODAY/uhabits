@@ -53,14 +53,16 @@ targets:
       - Tests
     dependencies:
       - target: LoopApp
-      - framework: ../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework
-        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app.tests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/LoopApp.app/LoopApp
         BUNDLE_LOADER: $(TEST_HOST)
+        # LoopKit is static and already linked into the host app. Tests only compile against the
+        # module (-F) and resolve symbols from the host, avoiding a second Kotlin/Native runtime.
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]": $(SRCROOT)/../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework/ios-arm64-simulator
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]": $(SRCROOT)/../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework/ios-arm64
 schemes:
   LoopApp:
     build:

@@ -12,7 +12,7 @@ final class LoopStoreTests: XCTestCase {
     private func makeStore(_ dir: String, defaults: UserDefaults) -> LoopStore {
         LoopStore(dbPath: dir + "/Loop.db",
                   resourcesPath: Bundle.main.resourcePath!,
-                  keyValueStore: UserDefaultsStore(defaults: defaults))
+                  keyValueStore: UserDefaultsStore(defaults: defaults, suiteName: nil))
     }
 
     private func input(_ name: String) -> HabitInput {
@@ -22,13 +22,12 @@ final class LoopStoreTests: XCTestCase {
     }
 
     private func defaults() -> UserDefaults {
-        let d = UserDefaults(suiteName: "test-" + UUID().uuidString)!
-        return d
+        UserDefaults(suiteName: "test-" + UUID().uuidString)!
     }
 
     func testStoreCreateToggleList() async throws {
         let store = makeStore(tempDir(), defaults: defaults())
-        await store.open()
+        try await store.open()
         let id = try await store.withKit { try $0.createHabit(input: input("Read")) }
         let today = try await store.withKit { try $0.today() }
         try await store.mutate { try $0.toggle(habitId: id, date: today) }
@@ -44,12 +43,12 @@ final class LoopStoreTests: XCTestCase {
         let d = defaults()
         let a = makeStore(dir, defaults: d)
         let b = makeStore(dir, defaults: d)
-        await a.open()
+        try await a.open()
         let id = try await a.withKit { try $0.createHabit(input: input("Run")) }
-        await b.open()
+        try await b.open()
         let today = try await a.withKit { try $0.today() }
         try await a.mutate { try $0.toggle(habitId: id, date: today) }
-        await b.reload()
+        try await b.reload()
         let rows = try await b.withKit { try $0.listHabits(dayCount: 1, includeArchived: false) }
         XCTAssertEqual(rows.count, 1)
         XCTAssertTrue(rows[0].isCompletedToday)
@@ -58,7 +57,7 @@ final class LoopStoreTests: XCTestCase {
     }
 
     func testUserDefaultsStoreRoundTrip() {
-        let store = UserDefaultsStore(defaults: defaults())
+        let store = UserDefaultsStore(defaults: defaults(), suiteName: nil)
         XCTAssertNil(store.getString(key: "k"))
         store.putString(key: "k", value: "v")
         XCTAssertEqual(store.getString(key: "k"), "v")
@@ -67,5 +66,29 @@ final class LoopStoreTests: XCTestCase {
         store.putString(key: "a", value: "1")
         store.clear()
         XCTAssertNil(store.getString(key: "a"))
+    }
+
+    func testClearOnlyAffectsOwnSuite() {
+        let nameA = "test-" + UUID().uuidString, nameB = "test-" + UUID().uuidString
+        let a = UserDefaultsStore(defaults: UserDefaults(suiteName: nameA)!, suiteName: nameA)
+        let b = UserDefaultsStore(defaults: UserDefaults(suiteName: nameB)!, suiteName: nameB)
+        a.putString(key: "k", value: "1")
+        b.putString(key: "k", value: "2")
+        a.clear()
+        XCTAssertNil(a.getString(key: "k"))
+        XCTAssertEqual(b.getString(key: "k"), "2")
+        b.clear()
+    }
+
+    func testOpenFailureThrows() async throws {
+        let dir = tempDir()
+        let store = LoopStore(dbPath: dir, resourcesPath: Bundle.main.resourcePath!,
+                              keyValueStore: UserDefaultsStore(defaults: defaults(), suiteName: nil))
+        do {
+            try await store.open()
+            XCTFail("expected throw")
+        } catch let LoopStoreError.openFailed(msg) {
+            XCTAssertFalse(msg.isEmpty)
+        }
     }
 }
