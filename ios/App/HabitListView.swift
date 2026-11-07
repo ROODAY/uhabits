@@ -204,6 +204,8 @@ struct HabitListView: View {
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
         }
+        .onReceive(NotificationRouter.shared.$pending) { _ in handlePending() }
+        .onChange(of: model.loaded) { _, _ in handlePending() }
         .sheet(item: $sheet) { s in
             switch s {
             case .number(let row, let cell):
@@ -220,6 +222,18 @@ struct HabitListView: View {
                                              set: { if !$0 { model.alertMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(model.alertMessage ?? "") }
+    }
+
+    /// Opens the numerical-entry sheet for a tapped numerical-habit notification (R-T14d).
+    private func handlePending() {
+        let router = NotificationRouter.shared
+        guard let p = router.pending, model.loaded else { return }
+        router.pending = nil
+        guard let row = model.rows.first(where: { $0.id == p.habitId }) else { return }  // deleted habit
+        let cell = row.days.first(where: { $0.date == p.date })
+            ?? DayCell(date: p.date, rawValue: 0, value: 0, isCompleted: false, notes: "")
+        if path.last != .detail(row.id) { path.append(.detail(row.id)) }
+        sheet = .number(row: row, cell: cell)
     }
 
     private var list: some View {

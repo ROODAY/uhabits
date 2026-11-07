@@ -27,6 +27,7 @@ struct HabitEditView: View {
     @State private var loaded = false
     @State private var confirmDelete = false
     @State private var saving = false
+    @State private var notificationsDenied = false
 
     private var palette: [Int] { scheme == .dark ? darkPalette : lightPalette }
 
@@ -66,6 +67,12 @@ struct HabitEditView: View {
             }
             Section("Reminder") {
                 ReminderPicker(enabled: $reminderOn, time: $reminderTime, days: $reminderDays)
+                if reminderOn && notificationsDenied {
+                    Text("Notifications are off for Loop in iOS Settings").font(.caption).foregroundStyle(.secondary)
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        Link("Open Settings", destination: url).font(.caption)
+                    }
+                }
             }
             if let error {
                 Section { Text(error).foregroundStyle(.red) }
@@ -87,7 +94,10 @@ struct HabitEditView: View {
             Button("Delete", role: .destructive) { Task { await delete() } }
             Button("Cancel", role: .cancel) {}
         } message: { Text("This also deletes all its history.") }
-        .task { await load() }
+        .task {
+            await load()
+            notificationsDenied = await NotificationPlanner.notificationsDenied()
+        }
     }
 
     private func load() async {
@@ -161,6 +171,11 @@ struct HabitEditView: View {
         saving = true
         defer { saving = false }
         do {
+            // Ask before saving: the post-save reschedule drops requests if not authorized.
+            if input.reminder != nil {
+                await NotificationPlanner.requestAuthorization()
+                notificationsDenied = await NotificationPlanner.notificationsDenied()
+            }
             try await LoopStore.shared.mutate { kit in
                 if let id { try kit.editHabit(habitId: id, input: input) }
                 else { _ = try kit.createHabit(input: input) }

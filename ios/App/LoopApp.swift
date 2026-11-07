@@ -1,7 +1,23 @@
 import SwiftUI
+import UserNotifications
+
+/// Sets up notification handling before launch finishes, so background action launches are handled (R-T14f/g).
+final class LoopAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        let center = UNUserNotificationCenter.current()
+        center.setNotificationCategories(NotificationPlanner.categories())
+        center.delegate = NotificationHandler.shared
+        BackgroundRefresh.register()
+        BackgroundRefresh.schedule()
+        Task { await NotificationPlanner.installHook() }
+        return true
+    }
+}
 
 @main
 struct LoopApp: App {
+    @UIApplicationDelegateAdaptor(LoopAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = HabitListModel()
     private let seedDemo = ProcessInfo.processInfo.arguments.contains(DemoSeed.flag)
@@ -18,8 +34,15 @@ struct LoopApp: App {
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             switch phase {
-            case .active: Task { await model.activate(seedDemo: seedDemo) }
-            case .background: Task { await model.deactivate() }
+            case .active:
+                Task {
+                    await model.activate(seedDemo: seedDemo)
+                    await NotificationPlanner.requestAuthorizationIfRemindersExist()
+                    await NotificationPlanner.reschedule()
+                }
+            case .background:
+                BackgroundRefresh.schedule()
+                Task { await model.deactivate() }
             default: break
             }
         }
