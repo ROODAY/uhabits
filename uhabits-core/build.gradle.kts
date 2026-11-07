@@ -121,4 +121,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimu
     filter.excludeTestsMatching("*CanvasTest")
     filter.excludeTestsMatching("*BarChartTest")
     filter.excludeTestsMatching("*HistoryChartTest")
+    // Zip support on iOS is deferred to phase 4 (ZipReader/ZipWriter throw).
+    filter.excludeTestsMatching("*ZipTest")
+    filter.excludeTestsMatching("*HabitsCSVExporterTest")
+    filter.excludeTestsMatching("*ListHabitsBehaviorTest.testOnExportCSV")
+    filter.excludeTestsMatching("*ShowHabitMenuPresenterTest.testOnExport")
 }
