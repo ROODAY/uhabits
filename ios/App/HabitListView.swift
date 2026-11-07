@@ -27,6 +27,8 @@ final class HabitListModel: ObservableObject {
     @Published var openError: String?
     @Published var alertMessage: String?
     @Published var loaded = false
+    /// Bumped after every successful refresh so open detail screens re-query.
+    @Published var refreshTick = 0
 
     private var midnightTimer: Timer?
     private var started = false
@@ -113,6 +115,7 @@ final class HabitListModel: ObservableObject {
             questionMarks = r.3
             openError = nil
             loaded = true
+            refreshTick += 1
             scheduleMidnight(delayHours: r.4)
         } catch { report(error) }
     }
@@ -196,9 +199,9 @@ struct HabitListView: View {
             }
         }
         .onChange(of: model.loaded, initial: true) { _, isLoaded in
-            guard isLoaded, !launchHandled, launchScreen == "edit", let first = model.rows.first else { return }
+            guard isLoaded, !launchHandled, launchScreen == "edit" || launchScreen == "detail", let first = model.rows.first else { return }
             launchHandled = true
-            path.append(.edit(first.id))
+            path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
         }
         .sheet(item: $sheet) { s in
             switch s {
