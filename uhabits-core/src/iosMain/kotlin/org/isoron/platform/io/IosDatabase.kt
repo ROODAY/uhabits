@@ -142,7 +142,7 @@ class IosPreparedStatement(
     }
 
     override fun bindNull(index: Int) {
-        sqlite3_bind_null(stmt, index + 1)
+        sqlite3_bind_null(stmt, index)
     }
 
     override fun reset() {
