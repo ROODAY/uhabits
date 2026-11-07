@@ -12,10 +12,19 @@ import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.DATABASE_VERSION
 import org.isoron.uhabits.core.commands.CommandRunner
+import org.isoron.uhabits.core.commands.CreateHabitCommand
+import org.isoron.uhabits.core.commands.DeleteHabitsCommand
+import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.HabitList
+import org.isoron.uhabits.core.models.HabitType
+import org.isoron.uhabits.core.models.NumericalHabitType
+import org.isoron.uhabits.core.models.PaletteColor
+import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.preferences.WidgetPreferences
@@ -175,6 +184,95 @@ class LoopKit(
             val current = h.originalEntries.get(d).value
             commandRunner.run(CreateRepetitionCommand(habitList, h, d, current, notes))
         }
+
+    /** Creates a habit and returns its new ID. Throws IllegalArgumentException on invalid input. */
+    fun createHabit(input: HabitInput): Long {
+        refreshToday()
+        validate(input)
+        val model = modelFactory.buildHabit()
+        apply(model, input)
+        val before = habitList.mapNotNull { it.id }.toSet()
+        commandRunner.run(CreateHabitCommand(modelFactory, habitList, model))
+        return habitList.mapNotNull { it.id }.first { it !in before }
+    }
+
+    /** Edits a habit. Unknown ID is a no-op. The habit type cannot change. */
+    fun editHabit(habitId: Long, input: HabitInput) {
+        refreshToday()
+        validate(input)
+        val existing = habitList.getById(habitId) ?: return
+        require(existing.isNumerical == input.isNumerical) { "habit type cannot change" }
+        val model = modelFactory.buildHabit()
+        model.copyFrom(existing)
+        apply(model, input)
+        commandRunner.run(EditHabitCommand(habitList, habitId, model))
+    }
+
+    /** Deletes a habit and its entries. Unknown ID is a no-op. */
+    fun deleteHabit(habitId: Long) {
+        refreshToday()
+        val habit = habitList.getById(habitId) ?: return
+        commandRunner.run(DeleteHabitsCommand(habitList, listOf(habit)))
+    }
+
+    /** Current values for pre-filling the edit screen, or null if the habit does not exist. */
+    fun habitInput(habitId: Long): HabitInput? {
+        refreshToday()
+        val h = habitList.getById(habitId) ?: return null
+        return HabitInput(
+            name = h.name,
+            question = h.question,
+            description = h.description,
+            colorIndex = h.color.paletteIndex,
+            isNumerical = h.isNumerical,
+            unit = h.unit,
+            targetValue = h.targetValue,
+            targetType = h.targetType.value,
+            freqNumerator = h.frequency.numerator,
+            freqDenominator = h.frequency.denominator,
+            reminder = h.reminder?.let { r ->
+                val packed = r.days.toArray()
+                ReminderDto(r.hour, r.minute, List(7) { i -> packed[(i + 1) % 7] })
+            }
+        )
+    }
+
+    private fun validate(input: HabitInput) {
+        require(input.name.isNotBlank()) { "name must not be blank" }
+        require(input.freqNumerator >= 1) { "frequency numerator must be >= 1" }
+        require(input.freqDenominator >= input.freqNumerator) { "frequency denominator must be >= numerator" }
+        require(input.colorIndex in 0..19) { "colorIndex out of range" }
+        if (input.isNumerical) {
+            require(input.targetValue >= 0) { "targetValue must be >= 0" }
+            require(input.targetType == NumericalHabitType.AT_LEAST.value || input.targetType == NumericalHabitType.AT_MOST.value) {
+                "invalid targetType"
+            }
+        }
+    }
+
+    private fun apply(h: Habit, input: HabitInput) {
+        h.name = input.name.trim()
+        h.question = input.question.trim()
+        h.description = input.description.trim()
+        h.color = PaletteColor(input.colorIndex)
+        h.frequency = Frequency(input.freqNumerator, input.freqDenominator)
+        if (input.isNumerical) {
+            h.type = HabitType.NUMERICAL
+            h.unit = input.unit.trim()
+            h.targetValue = input.targetValue
+            h.targetType = NumericalHabitType.fromInt(input.targetType)
+        } else {
+            h.type = HabitType.YES_NO
+            h.unit = ""
+            h.targetValue = 0.0
+            h.targetType = NumericalHabitType.AT_LEAST
+        }
+        h.reminder = input.reminder?.let { r ->
+            val packed = BooleanArray(7)
+            for (i in 0..6) packed[(i + 1) % 7] = r.days[i]
+            Reminder(r.hour, r.minute, WeekdayList(packed))
+        }
+    }
 
     private fun load() {
         loaded = false
