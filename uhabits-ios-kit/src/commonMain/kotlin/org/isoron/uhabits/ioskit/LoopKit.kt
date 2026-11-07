@@ -44,7 +44,7 @@ fun interface TodaySource {
  * Facade over the habit core. NOT thread-safe: callers (the Swift actor) must
  * serialize all calls, including reload() and close().
  */
-class LoopKit(
+class LoopKit @Throws(Exception::class) constructor(
     private val databaseOpener: DatabaseOpener,
     private val fileOpener: FileOpener,
     private val dbPath: String,
@@ -73,11 +73,13 @@ class LoopKit(
     }
 
     /** Closes and reopens the database, picking up writes made by other processes. */
+    @Throws(Exception::class)
     fun reload() {
         close()
         load()
     }
 
+    @Throws(Exception::class)
     fun close() {
         loaded = false
         try {
@@ -87,6 +89,7 @@ class LoopKit(
         }
     }
 
+    @Throws(Exception::class)
     fun listHabits(dayCount: Int, includeArchived: Boolean): List<HabitRow> {
         val today = refreshToday()
         return habitList
@@ -140,6 +143,7 @@ class LoopKit(
      * Detail for one habit, or null if it does not exist. `row.days` covers [historyDays] days.
      * `currentStreak` is the length of the streak ending today or yesterday, else 0.
      */
+    @Throws(Exception::class)
     fun habitDetail(habitId: Long, historyDays: Int): HabitDetail? {
         val today = refreshToday()
         val h = habitList.getById(habitId) ?: return null
@@ -163,6 +167,7 @@ class LoopKit(
      * Occurrences earlier than or equal to [nowMinuteOfDay] on [nowDate] are skipped. The completion
      * check uses the habit day at the fire moment (previous calendar day while before the midnight delay).
      */
+    @Throws(Exception::class)
     fun upcomingReminders(nowDate: String, nowMinuteOfDay: Int, horizonDays: Int, maxCount: Int): List<ReminderOccurrence> {
         refreshToday()
         val start = parseIso(nowDate)
@@ -188,6 +193,7 @@ class LoopKit(
     }
 
     /** 20 RGB ints (0xRRGGBB) for palette indices 0..19. */
+    @Throws(Exception::class)
     fun palette(dark: Boolean): List<Int> {
         val theme: Theme = if (dark) DarkTheme() else LightTheme()
         return (0 until 20).map { i ->
@@ -198,13 +204,16 @@ class LoopKit(
 
     private fun channel(v: Double): Int = (v * 255.0).roundToInt().coerceIn(0, 255)
 
+    @Throws(Exception::class)
     fun today(): String = refreshToday().iso()
 
+    @Throws(Exception::class)
     fun midnightDelayHours(): Int {
         refreshToday()
         return prefs.midnightDelayHours
     }
 
+    @Throws(Exception::class)
     fun areQuestionMarksEnabled(): Boolean {
         refreshToday()
         return prefs.areQuestionMarksEnabled
@@ -219,24 +228,30 @@ class LoopKit(
     }
 
     /** Cycles a yes/no entry using the user's skip / question-mark preferences. */
+    @Throws(Exception::class)
     fun toggle(habitId: Long, date: String) =
         mutate(habitId, date, false) { h, d -> widgetBehavior.onToggleRepetition(h, d) }
 
     /** Marks a yes/no entry as done (YES_MANUAL). */
+    @Throws(Exception::class)
     fun markDone(habitId: Long, date: String) =
         mutate(habitId, date, false) { h, d -> widgetBehavior.onAddRepetition(h, d) }
 
+    @Throws(Exception::class)
     fun increment(habitId: Long, date: String) =
         mutate(habitId, date, true) { h, d -> widgetBehavior.onIncrement(h, d, 1000) }
 
+    @Throws(Exception::class)
     fun decrement(habitId: Long, date: String) =
         mutate(habitId, date, true) { h, d -> widgetBehavior.onDecrement(h, d, 1000) }
 
+    @Throws(Exception::class)
     fun setNumber(habitId: Long, date: String, value: Double, notes: String) =
         mutate(habitId, date, true) { h, d ->
             widgetBehavior.setValue(h, d, (value * 1000).roundToInt(), notes)
         }
 
+    @Throws(Exception::class)
     fun setNotes(habitId: Long, date: String, notes: String) =
         mutate(habitId, date, null) { h, d ->
             val current = h.originalEntries.get(d).value
@@ -244,6 +259,7 @@ class LoopKit(
         }
 
     /** Creates a habit and returns its new ID. Throws IllegalArgumentException on invalid input. */
+    @Throws(Exception::class)
     fun createHabit(input: HabitInput): Long {
         refreshToday()
         validate(input)
@@ -255,6 +271,7 @@ class LoopKit(
     }
 
     /** Edits a habit. Unknown ID is a no-op. The habit type cannot change. */
+    @Throws(Exception::class)
     fun editHabit(habitId: Long, input: HabitInput) {
         refreshToday()
         validate(input)
@@ -267,6 +284,7 @@ class LoopKit(
     }
 
     /** Deletes a habit and its entries. Unknown ID is a no-op. */
+    @Throws(Exception::class)
     fun deleteHabit(habitId: Long) {
         refreshToday()
         val habit = habitList.getById(habitId) ?: return
@@ -274,6 +292,7 @@ class LoopKit(
     }
 
     /** Current values for pre-filling the edit screen, or null if the habit does not exist. */
+    @Throws(Exception::class)
     fun habitInput(habitId: Long): HabitInput? {
         refreshToday()
         val h = habitList.getById(habitId) ?: return null
