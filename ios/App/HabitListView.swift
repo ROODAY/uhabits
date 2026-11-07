@@ -63,8 +63,9 @@ final class HabitListModel: ObservableObject {
 
     /// Called when the app becomes active.
     func activate(seedDemo: Bool) async {
+        isActive = true  // synchronous: the last lifecycle call wins
         await enqueue { [self] in
-            isActive = true
+            guard isActive else { return }  // superseded by a later deactivate
             start()
             do {
                 if seedDemo { try await DemoSeed.seedIfEmpty(store) }
@@ -79,7 +80,7 @@ final class HabitListModel: ObservableObject {
         await enqueue { [self] in
             midnightTimer?.invalidate()
             midnightTimer = nil
-            // A later activate may already have run; only close if still inactive.
+            // Decide from the state at the time this work runs, so the last call wins.
             if !isActive { await store.close() }
         }
     }

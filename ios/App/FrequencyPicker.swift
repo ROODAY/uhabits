@@ -39,7 +39,7 @@ enum FrequencyPreset: Equatable {
         case .everyDay: return "Every day"
         case .everyWeek: return "Every week"
         case .timesPerWeek(let n): return "\(n) times per week"
-        case .timesPerMonth(let n): return "\(n) times per month"
+        case .timesPerMonth(let n): return n == 1 ? "Every month" : "\(n) times per month"
         case .everyNDays(let n): return "Every \(n) days"
         case .custom(let n, let d): return "Custom: \(n) times in \(d) days"
         }
@@ -102,14 +102,20 @@ enum FrequencyPreset: Equatable {
 
 struct FrequencyPicker: View {
     @Binding var preset: FrequencyPreset
+    /// The habit's original non-preset value, kept selectable for the session.
+    var customOption: FrequencyPreset?
 
     private var kinds: [FrequencyPreset.Kind] {
-        FrequencyPreset.Kind.allCases.filter { $0 != .custom || preset.kind == .custom }
+        FrequencyPreset.Kind.allCases.filter { $0 != .custom || customOption != nil || preset.kind == .custom }
+    }
+
+    private func select(_ kind: FrequencyPreset.Kind) {
+        if kind == .custom, let c = customOption { preset = c } else { preset = preset.switched(to: kind) }
     }
 
     var body: some View {
         Picker("Frequency", selection: Binding(get: { preset.kind },
-                                               set: { preset = preset.switched(to: $0) })) {
+                                               set: { select($0) })) {
             ForEach(kinds, id: \.self) { Text($0.title).tag($0) }
         }
         if let n = preset.amount {

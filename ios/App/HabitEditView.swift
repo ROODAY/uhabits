@@ -17,6 +17,7 @@ struct HabitEditView: View {
     @State private var targetType: Int32 = 0
     @State private var colorIndex = 11
     @State private var freq: FrequencyPreset = .everyDay
+    @State private var customFreq: FrequencyPreset?
     @State private var reminderOn = false
     @State private var reminderTime = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date()
     @State private var reminderDays = [Bool](repeating: true, count: 7)
@@ -61,7 +62,7 @@ struct HabitEditView: View {
                 HabitColorPicker(selected: $colorIndex, palette: palette)
             }
             Section("Schedule") {
-                FrequencyPicker(preset: $freq)
+                FrequencyPicker(preset: $freq, customOption: customFreq)
             }
             Section("Reminder") {
                 ReminderPicker(enabled: $reminderOn, time: $reminderTime, days: $reminderDays)
@@ -117,6 +118,7 @@ struct HabitEditView: View {
         targetText = h.isNumerical ? Self.formatTarget(h.targetValue) : ""
         targetType = h.targetType
         freq = .from(numerator: Int(h.freqNumerator), denominator: Int(h.freqDenominator))
+        if case .custom = freq { customFreq = freq }
         if let r = h.reminder {
             reminderOn = true
             reminderTime = Calendar.current.date(from: DateComponents(hour: Int(r.hour), minute: Int(r.minute))) ?? reminderTime
