@@ -126,19 +126,19 @@ class IosPreparedStatement(
     }
 
     override fun bindInt(index: Int, value: Int) {
-        sqlite3_bind_int(stmt, index + 1, value)
+        sqlite3_bind_int(stmt, index, value)
     }
 
     override fun bindLong(index: Int, value: Long) {
-        sqlite3_bind_int64(stmt, index + 1, value)
+        sqlite3_bind_int64(stmt, index, value)
     }
 
     override fun bindReal(index: Int, value: Double) {
-        sqlite3_bind_double(stmt, index + 1, value)
+        sqlite3_bind_double(stmt, index, value)
     }
 
     override fun bindText(index: Int, value: String) {
-        sqlite3_bind_text(stmt, index + 1, value, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, index, value, -1, SQLITE_TRANSIENT)
     }
 
     override fun bindNull(index: Int) {
