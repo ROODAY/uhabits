@@ -47,6 +47,10 @@ jobs:
           xcrun simctl launch "$UDID" "$BID" --seed-demo --screen list
           sleep 20
           xcrun simctl io "$UDID" screenshot build/list.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+          xcrun simctl launch "$UDID" "$BID" --seed-demo --screen edit
+          sleep 20
+          xcrun simctl io "$UDID" screenshot build/edit.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
