@@ -27,13 +27,17 @@ import org.isoron.uhabits.core.models.NumericalHabitType
  *
  * A reminder is shown only if the habit has a reminder, is not archived, the reminder
  * is enabled for the weekday of [date], and the habit has not already been completed
- * on [date] (habits with an AT_MOST target are still reminded when completed).
+ * on [completionDate] (habits with an AT_MOST target are still reminded when completed).
+ *
+ * [date] is the calendar day of the reminder; [completionDate] is the day whose completion
+ * state suppresses it. Android passes the midnight-delay-aware "today" here, which can
+ * differ from [date].
  */
-fun shouldShowReminder(habit: Habit, date: LocalDate): Boolean {
+fun shouldShowReminder(habit: Habit, date: LocalDate, completionDate: LocalDate): Boolean {
     val reminder = habit.reminder ?: return false
     if (habit.isArchived) return false
     val weekday = (date.dayOfWeek.daysSinceSunday + 1) % 7
     if (!reminder.days.toArray()[weekday]) return false
-    if (habit.isCompletedOn(date) && habit.targetType != NumericalHabitType.AT_MOST) return false
+    if (habit.isCompletedOn(completionDate) && habit.targetType != NumericalHabitType.AT_MOST) return false
     return true
 }

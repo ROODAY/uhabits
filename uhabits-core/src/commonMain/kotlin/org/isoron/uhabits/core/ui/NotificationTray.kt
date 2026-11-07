@@ -20,12 +20,14 @@ package org.isoron.uhabits.core.ui
 
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.time.LocalDate
+import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.AppScope
 import org.isoron.uhabits.core.commands.Command
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.reminders.shouldShowReminder
 import org.isoron.uhabits.core.tasks.Task
@@ -109,18 +111,19 @@ open class NotificationTray(
     internal class NotificationData(val date: LocalDate, val reminderTime: Long)
     private inner class ShowNotificationTask(private val habit: Habit, data: NotificationData) :
         Task {
+        var isCompleted = false
         private val date: LocalDate = data.date
         private val reminderTime: Long = data.reminderTime
 
         override suspend fun doInBackground() {
-            // Warm up computed entries off the main thread before the check.
-            habit.isCompletedOn(date)
+            isCompleted = habit.isCompletedToday()
         }
 
         override fun onPostExecute() {
             systemTray.log("Showing notification for habit=" + habit.id)
-            if (!shouldShowReminder(habit, date)) {
-                systemTray.log("Habit ${habit.id} should not be reminded on $date. Skipping.")
+            // Completion is checked against today (midnight-delay aware), not the reminder date.
+            if (!shouldShowReminder(habit, date, getToday())) {
+                logSkipReason()
                 return
             }
             systemTray.showNotification(
@@ -129,6 +132,16 @@ open class NotificationTray(
                 date,
                 reminderTime
             )
+        }
+
+        private fun logSkipReason() {
+            val msg = when {
+                isCompleted && habit.targetType != NumericalHabitType.AT_MOST -> "already checked"
+                !habit.hasReminder() -> "does not have a reminder"
+                habit.isArchived -> "is archived"
+                else -> "not supposed to run today"
+            }
+            systemTray.log("Habit ${habit.id} $msg. Skipping.")
         }
     }
 

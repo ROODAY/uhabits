@@ -42,14 +42,14 @@ class ReminderRulesTest : BaseUnitTest() {
     @Test
     fun noReminder_false() {
         val habit = fixtures.createEmptyHabit()
-        assertFalse(shouldShowReminder(habit, sunday))
+        assertFalse(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
     fun archived_false() {
         val habit = habitWithReminder()
         habit.isArchived = true
-        assertFalse(shouldShowReminder(habit, sunday))
+        assertFalse(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
@@ -57,7 +57,7 @@ class ReminderRulesTest : BaseUnitTest() {
         val days = BooleanArray(7)
         days[2] = true // Monday
         val habit = habitWithReminder(WeekdayList(days))
-        assertFalse(shouldShowReminder(habit, sunday))
+        assertFalse(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
@@ -65,7 +65,7 @@ class ReminderRulesTest : BaseUnitTest() {
         val days = BooleanArray(7)
         days[1] = true // Sunday
         val habit = habitWithReminder(WeekdayList(days))
-        assertTrue(shouldShowReminder(habit, sunday))
+        assertTrue(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
@@ -73,7 +73,7 @@ class ReminderRulesTest : BaseUnitTest() {
         val habit = habitWithReminder()
         habit.originalEntries.add(Entry(sunday, Entry.YES_MANUAL))
         habit.recompute()
-        assertFalse(shouldShowReminder(habit, sunday))
+        assertFalse(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
@@ -83,12 +83,22 @@ class ReminderRulesTest : BaseUnitTest() {
         habit.originalEntries.add(Entry(sunday, 1000))
         habit.recompute()
         assertTrue(habit.isCompletedOn(sunday))
-        assertTrue(shouldShowReminder(habit, sunday))
+        assertTrue(shouldShowReminder(habit, sunday, sunday))
     }
 
     @Test
     fun notCompleted_true() {
         val habit = habitWithReminder()
-        assertTrue(shouldShowReminder(habit, sunday))
+        assertTrue(shouldShowReminder(habit, sunday, sunday))
+    }
+
+    @Test
+    fun completionDateDiffersFromDate_usesCompletionDate() {
+        val habit = habitWithReminder()
+        val saturday = LocalDate(2015, 1, 24)
+        habit.originalEntries.add(Entry(saturday, Entry.YES_MANUAL))
+        habit.recompute()
+        assertFalse(shouldShowReminder(habit, sunday, saturday))
+        assertTrue(shouldShowReminder(habit, sunday, sunday))
     }
 }
