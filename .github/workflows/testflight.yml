@@ -3,9 +3,13 @@ on:
   workflow_dispatch:
   push:
     tags: ['ios-v*']
+concurrency:
+  group: testflight
+  cancel-in-progress: false
 jobs:
   upload:
-    runs-on: macos-latest
+    runs-on: macos-26
+    timeout-minutes: 60
     steps:
       - name: Check required secrets and variables
         env:
@@ -32,6 +36,11 @@ jobs:
           path: ~/.konan
           key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-${{ runner.os }}-
+      - name: Select Xcode 26.6
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i ios
       - name: Build LoopKit XCFramework
         run: ./gradlew :uhabits-ios-kit:assembleLoopKitReleaseXCFramework --no-daemon
       - name: Install XcodeGen
@@ -49,36 +58,36 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          LOOP_BUNDLE_PREFIX: ${{ vars.LOOP_BUNDLE_PREFIX }}
+          LOOP_APP_GROUP: ${{ vars.LOOP_APP_GROUP }}
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/logs"
           cd ios
-          xcodebuild archive -project Loop.xcodeproj -scheme LoopApp \
-            -configuration Release -destination 'generic/platform=iOS' \
-            -archivePath build/Loop.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            LOOP_BUNDLE_PREFIX=${{ vars.LOOP_BUNDLE_PREFIX }} \
-            LOOP_APP_GROUP=${{ vars.LOOP_APP_GROUP }} \
-            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+          xcodebuild archive -project Loop.xcodeproj -scheme LoopApp             -configuration Release -destination 'generic/platform=iOS'             -archivePath build/Loop.xcarchive             -allowProvisioningUpdates             -authenticationKeyPath "$KEY_PATH"             -authenticationKeyID "$ASC_KEY_ID"             -authenticationKeyIssuerID "$ASC_ISSUER_ID"             LOOP_BUNDLE_PREFIX="$LOOP_BUNDLE_PREFIX"             LOOP_APP_GROUP="$LOOP_APP_GROUP"             DEVELOPMENT_TEAM="$APPLE_TEAM_ID"             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" 2>&1 | tee "$RUNNER_TEMP/logs/archive.log"
       - name: Export and upload to App Store Connect
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          set -o pipefail
           cd ios
           cp ExportOptions.plist build/ExportOptions.plist
           plutil -replace teamID -string "$APPLE_TEAM_ID" build/ExportOptions.plist
-          xcodebuild -exportArchive \
-            -archivePath build/Loop.xcarchive \
-            -exportPath build/export \
-            -exportOptionsPlist build/ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          xcodebuild -exportArchive             -archivePath build/Loop.xcarchive             -exportPath build/export             -exportOptionsPlist build/ExportOptions.plist             -allowProvisioningUpdates             -authenticationKeyPath "$KEY_PATH"             -authenticationKeyID "$ASC_KEY_ID"             -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/logs/export.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/logs/*.log
+            ios/build/export/*.log
+            ios/build/**/*.xcresult
       - name: Remove API key
         if: always()
         run: rm -rf "$RUNNER_TEMP/keys"

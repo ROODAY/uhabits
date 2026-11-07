@@ -32,6 +32,15 @@ Automatic signing can create these itself, but doing it explicitly avoids first-
 
 Push Notifications is NOT needed. Loop only uses local notifications.
 
+## 3b. Register at least one device
+
+Automatic signing on a team with zero registered devices can fail with "Your team has no devices from which to generate a provisioning profile". Register one device (name plus UDID is enough) before the first run:
+
+1. Find the iPhone's UDID. Easiest: connect it to a Mac, open Finder, select the iPhone in the sidebar, and click the grey text under its name (storage/battery line) until it shows the **UDID**, then right-click -> Copy. On Windows, open iTunes or the Apple Devices app, select the phone, and click the serial number line until it shows UDID. Alternatively, use Apple Configurator on a Mac (select the device -> Get Info).
+2. developer.apple.com -> Certificates, IDs & Profiles -> **Devices** -> **+**.
+3. Platform iOS, any Device Name (e.g. My iPhone), paste the UDID. Continue -> Register.
+
+TestFlight testers do not need to be registered devices; this only satisfies the signing tool.
 ## 4. Create the App Store Connect app record
 
 1. Go to https://appstoreconnect.apple.com -> **Apps** (My Apps) -> **+** -> **New App**.
@@ -60,10 +69,16 @@ gh secret set APPLE_TEAM_ID -R ROODAY/uhabits
 
 The key file is stored base64-encoded.
 
-macOS / Linux / Git Bash:
+Linux / Git Bash:
 
 ```
 base64 -w0 AuthKey_XXXX.p8 | gh secret set ASC_KEY_P8 -R ROODAY/uhabits
+```
+
+macOS (its base64 has no -w0):
+
+```
+base64 -i AuthKey_XXXX.p8 | tr -d '\n' | gh secret set ASC_KEY_P8 -R ROODAY/uhabits
 ```
 
 PowerShell:
@@ -86,9 +101,9 @@ Check with `gh secret list -R ROODAY/uhabits` and `gh variable list -R ROODAY/uh
 Internal testers must first be **users of your App Store Connect team**. This is the most common stumbling block.
 
 1. App Store Connect -> **Users and Access** -> **Users** -> **+**.
-2. Enter her name and the email of her Apple ID. Role: **Marketing** or **Customer Support** (these have no real power). Under apps, you can restrict access to Loop. Invite.
-3. She accepts the invitation email (it must be opened with that Apple ID).
-4. App Store Connect -> your app -> **TestFlight** -> **Internal Testing** -> **+** next to "Internal Testing" -> create a group (e.g. `Family`), enable automatic distribution of builds if offered, and add her from the list. (You can add yourself too.)
+2. Enter your tester's name and the email of their Apple ID. Role: **Marketing** or **Customer Support** (these have no real power). Under apps, you can restrict access to Loop. Invite.
+3. Your tester accepts the invitation email (it must be opened with that Apple ID).
+4. App Store Connect -> your app -> **TestFlight** -> **Internal Testing** -> **+** next to "Internal Testing" -> create a group (e.g. `Family`), enable automatic distribution of builds if offered, and add your tester from the list. (You can add yourself too.)
 
 ## 8. Run the build
 
@@ -106,9 +121,9 @@ The build takes about 15-25 minutes on GitHub (the Kotlin framework is the slow 
 
 TestFlight builds expire after 90 days. Push a new tag to refresh.
 
-## 9. On her phone
+## 9. On the tester's phone
 
-1. Install **TestFlight** from the App Store and open the invitation (email, or the TestFlight app itself) with her Apple ID. Accept it.
+1. Install **TestFlight** from the App Store and open the invitation (email, or the TestFlight app itself) with their Apple ID. Accept it.
 2. Install **Loop** from TestFlight, open it once, and tap **Allow** for notifications.
 3. Add the widget: long-press an empty spot on the Home Screen -> **+** (top left) -> search **Loop** -> **Habit check-off** -> Add Widget.
 4. Long-press the widget -> **Edit Widget** -> choose a habit.
@@ -119,6 +134,7 @@ TestFlight builds expire after 90 days. Push a new tag to refresh.
 - **"No signing certificate" / "No profiles for ... were found"**: automatic signing needs the API key to have the **App Manager** role (lower roles cannot create certificates). The first run creates the distribution certificate and profiles. Check that `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` and the base64 `ASC_KEY_P8` are right. Apple limits the number of distribution certificates; if you hit the limit, revoke an unused one at developer.apple.com -> Certificates.
 - **Missing or invalid icon** (`Missing required icon file`, or an alpha-channel error): the repo ships a 1024x1024 opaque icon at `ios/App/Assets.xcassets/AppIcon.appiconset`. If you replace it, keep it 1024x1024 with no transparency.
 - **Bundle ID mismatch** (`No app record found` / `bundle identifier ... does not match`): the `LOOP_BUNDLE_PREFIX` variable must equal the prefix used for the App Store Connect app record's bundle ID (`<prefix>.app`), and the App Group must be `group.<prefix>`. Fix the variable and re-run with a new tag.
+- **"Your team has no devices from which to generate a provisioning profile"**: register at least one device (step 3b), then re-run with a new tag.
 - **App Group errors**: both App IDs (`.app` and `.app.widgets`) need the App Groups capability configured with `group.<prefix>` (step 3).
 - **"The bundle version must be higher than the previously uploaded version"**: the build number is the GitHub run number, so it always grows. This only happens if you re-uploaded the same run. Push a new tag (a fresh run).
 - **Empty secret/variable error** at the start of the run: the first step names whichever is missing; set it per step 6.
