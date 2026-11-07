@@ -8,7 +8,22 @@ enum ChangeSignal {
     private static var handlers: [@Sendable () -> Void] = []
     private static var installed = false
 
+    private static var lastOwnPost: Date?
+
+    /// True when this process posted the signal moments ago. Darwin notifications carry no sender, so the
+    /// poster hears its own post; its kit already holds those writes and needs no reload. A short window is
+    /// used because deliveries can coalesce. A false negative only costs an extra reload.
+    static var isOwnPost: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let t = lastOwnPost else { return false }
+        return Date().timeIntervalSince(t) < 1.0
+    }
+
     static func post() {
+        lock.lock()
+        lastOwnPost = Date()
+        lock.unlock()
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDarwinNotifyCenter(),
             CFNotificationName(name as CFString), nil, nil, true)

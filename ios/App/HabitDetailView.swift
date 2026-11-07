@@ -10,6 +10,8 @@ final class HabitDetailModel: ObservableObject {
     @Published var errorMessage: String?
     private let store: LoopStore
     let habitId: Int64
+    /// Reports whether the app UI is active. The detail screen must never reopen the DB while backgrounded.
+    var isActive: @MainActor () -> Bool = { true }
 
     init(habitId: Int64, store: LoopStore = .shared) {
         self.habitId = habitId
@@ -17,6 +19,7 @@ final class HabitDetailModel: ObservableObject {
     }
 
     func refresh() async {
+        guard isActive() else { return }
         do {
             let id = habitId
             let r = try await store.withKit { kit in
@@ -32,7 +35,8 @@ final class HabitDetailModel: ObservableObject {
 
     private func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
         do { try await store.mutate(body) } catch { errorMessage = String(describing: error) }
-        await refresh()
+        // The mutate may have (re)opened the DB after the app went to the background: close it again.
+        if isActive() { await refresh() } else { await store.close() }
     }
 
     func toggle(_ cell: DayCell) async {
@@ -82,7 +86,10 @@ struct HabitDetailView: View {
                 Button("Edit") { onEdit(model.habitId) }
             }
         }
-        .task { if listModel.isActive { await model.refresh() } }
+        .task {
+            model.isActive = { [weak listModel] in listModel?.isActive ?? false }
+            await model.refresh()
+        }
         .onChange(of: listModel.refreshTick) { _, _ in
             Task { await model.refresh() }
         }

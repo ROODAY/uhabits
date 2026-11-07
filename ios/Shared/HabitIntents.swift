@@ -18,10 +18,7 @@ enum HabitStoreAccess {
     }
 
     static func closeIfAllowed() async {
-        #if LOOP_APP
-        if await NotificationPlanner.isForeground() { return }
-        #endif
-        await LoopStore.shared.close()
+        await NotificationPlanner.closeStoreIfInactive()
     }
 }
 
@@ -39,34 +36,12 @@ enum HabitActions {
                 case .decrement: try kit.decrement(habitId: habitId, date: today)
                 }
             }
-            #if LOOP_APP
-            await NotificationPlanner.reschedule()
-            #else
-            await clearNotificationsIfDone(habitId: habitId)
-            await LoopStore.shared.close()
-            #endif
-        } catch {
-            #if LOOP_APP
-            await NotificationPlanner.reschedule()
-            #else
-            await LoopStore.shared.close()
-            #endif
-        }
+        } catch {}
+        // Re-plan reminders before finishing (design 6.4): restores today's reminder after an un-check and
+        // suppresses reminders of completed periods. Reuses the open kit, then closes it unless the app UI is up.
+        await NotificationPlanner.reschedule()
+        await NotificationPlanner.closeStoreIfInactive()
     }
-
-    #if !LOOP_APP
-    /// Extension only: once the habit is done for today, drop its reminder (R-T15b).
-    private static func clearNotificationsIfDone(habitId: Int64) async {
-        let row = try? await LoopStore.shared.withKit { kit in
-            try kit.listHabits(dayCount: 0, includeArchived: false).first { $0.id == habitId }
-        }
-        guard let row, row.isCompletedToday else { return }
-        let ids = ["habit-\(habitId)-\(row.today)", "snooze-\(habitId)"]
-        let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: ids)
-        center.removeDeliveredNotifications(withIdentifiers: ids)
-    }
-    #endif
 }
 
 struct ToggleHabitIntent: AppIntent {

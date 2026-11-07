@@ -1,17 +1,10 @@
 import Foundation
-import UIKit
 import UserNotifications
 import LoopKit
 
-/// Single source of truth for "UI is in use" (R-T14h). Set synchronously by the scenePhase handler;
-/// stays false on background launches (notification actions, BGTasks).
-@MainActor
-enum AppActivity {
-    static var isForeground = false
-}
-
 /// Pre-schedules concrete reminder occurrences computed by the facade (iOS cannot run code at fire time).
-/// App-only: shared intents call `reschedule()` under `#if LOOP_APP`.
+/// Compiled into the app and the widget extension, so widget/App Intent mutations re-plan reminders
+/// before they finish (design 6.4). `AppActivity` (app only) tells it whether the UI is in the foreground.
 enum NotificationPlanner {
     static let maxPending = 60
     static let snoozeMinutes = 15
@@ -95,11 +88,11 @@ enum NotificationPlanner {
 
     /// Replaces pending `habit-*` requests with the facade's upcoming occurrences. Concurrent calls are serialized.
     /// Closes the store afterwards when the app is not active (R-T14a).
-    static func reschedule(closeIfInactive: Bool = true) async {
-        await enqueue { await performReschedule(closeIfInactive: closeIfInactive) }.value
+    static func reschedule() async {
+        await enqueue { await performReschedule() }.value
     }
 
-    private static func performReschedule(closeIfInactive: Bool) async {
+    private static func performReschedule() async {
         let now = Date()
         var result: ([ReminderOccurrence], [HabitRow])?
         do {
@@ -109,7 +102,7 @@ enum NotificationPlanner {
                  try kit.listHabits(dayCount: 1, includeArchived: false))
             }
         } catch {}
-        if shouldClose(isForeground: await isForeground(), closeIfInactive: closeIfInactive) { await LoopStore.shared.close() }
+        await closeStoreIfInactive()
         guard let (occurrences, rows) = result else { return }
 
         let center = UNUserNotificationCenter.current()
@@ -131,8 +124,19 @@ enum NotificationPlanner {
         closeIfInactive && !isForeground
     }
 
+    /// Closes the shared store unless the app UI is in the foreground. Every store access that can run
+    /// while the app may be backgrounded must end with this (0xdead10cc rule).
+    static func closeStoreIfInactive() async {
+        if shouldClose(isForeground: await isForeground(), closeIfInactive: true) { await LoopStore.shared.close() }
+    }
+
+    /// Always false in the widget extension, which never holds the store open.
     static func isForeground() async -> Bool {
-        await MainActor.run { AppActivity.isForeground }
+        #if LOOP_APP
+        return await MainActor.run { AppActivity.isForeground }
+        #else
+        return false
+        #endif
     }
 
     // MARK: Permission
@@ -153,6 +157,7 @@ enum NotificationPlanner {
             return !(try kit.upcomingReminders(nowDate: DateKey.iso(now), nowMinuteOfDay: Int32(DateKey.minuteOfDay(now)),
                                                horizonDays: 14, maxCount: 1)).isEmpty
         }) ?? false
+        await closeStoreIfInactive()
         if any { await requestAuthorization() }
     }
 }

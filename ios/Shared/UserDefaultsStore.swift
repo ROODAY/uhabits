@@ -25,7 +25,7 @@ final class UserDefaultsStore: NSObject, KeyValueStore {
 
     func clear() {
         if let suiteName {
-            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            defaults.removePersistentDomain(forName: suiteName)
         } else {
             for key in defaults.dictionaryRepresentation().keys { defaults.removeObject(forKey: key) }
         }

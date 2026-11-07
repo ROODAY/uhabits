@@ -138,7 +138,7 @@ struct HabitEditView: View {
     }
 
     private static func formatTarget(_ v: Double) -> String {
-        v == v.rounded() ? String(Int(v)) : String(v)
+        v.isFinite && abs(v) < 1e15 && v == v.rounded() ? String(Int(v)) : String(v)
     }
 
     private func buildInput() -> HabitInput? {

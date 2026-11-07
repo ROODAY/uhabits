@@ -56,7 +56,12 @@ final class HistoryGridTests: XCTestCase {
     }
 
     func testFutureDaysAreNil() {
-        let g = HistoryGrid.layout(days: days(), firstWeekday: 1, today: "2026-11-06", calendar: cal)
-        XCTAssertNil(find(g, "2026-11-07"))
+        // Feed future cells on purpose: the layout itself must drop them.
+        let future = ["2026-11-07", "2026-11-08", "2026-11-20"].map {
+            DayCell(date: $0, rawValue: 2, value: 1, isCompleted: true, notes: "")
+        }
+        let g = HistoryGrid.layout(days: future.reversed() + days(), firstWeekday: 1, today: "2026-11-06", calendar: cal)
+        XCTAssertNotNil(find(g, "2026-11-06"))
+        for d in ["2026-11-07", "2026-11-08", "2026-11-20"] { XCTAssertNil(find(g, d)) }
     }
 }

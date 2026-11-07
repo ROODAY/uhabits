@@ -52,6 +52,6 @@ struct CheckmarkEntry: TimelineEntry, Equatable {
 
     static func format(_ v: Double) -> String {
         let r = (v * 100).rounded() / 100
-        return r == r.rounded() ? String(Int(r)) : String(r)
+        return r.isFinite && abs(r) < 1e15 && r == r.rounded() ? String(Int(r)) : String(r)
     }
 }

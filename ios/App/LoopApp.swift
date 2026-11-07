@@ -15,6 +15,24 @@ final class LoopAppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+/// Runs `work` inside a UIKit background task so it can finish after the app leaves the foreground.
+@MainActor
+enum BackgroundGrace {
+    private final class Token { var id = UIBackgroundTaskIdentifier.invalid }
+
+    static func run(_ work: @escaping @MainActor () async -> Void) {
+        let app = UIApplication.shared
+        let token = Token()
+        token.id = app.beginBackgroundTask(withName: "close-store") {
+            if token.id != .invalid { app.endBackgroundTask(token.id); token.id = .invalid }
+        }
+        Task { @MainActor in
+            await work()
+            if token.id != .invalid { app.endBackgroundTask(token.id); token.id = .invalid }
+        }
+    }
+}
+
 @main
 struct LoopApp: App {
     @UIApplicationDelegateAdaptor(LoopAppDelegate.self) private var appDelegate
@@ -39,12 +57,13 @@ struct LoopApp: App {
                 Task {
                     await model.activate(seedDemo: seedDemo)
                     await NotificationPlanner.requestAuthorizationIfRemindersExist()
-                    await NotificationPlanner.reschedule(closeIfInactive: false)
+                    await NotificationPlanner.reschedule()
                 }
             case .background:
                 AppActivity.isForeground = false
                 BackgroundRefresh.schedule()
-                Task { await model.deactivate() }
+                // Ask for extra time so the DB close finishes before the process is suspended (0xdead10cc).
+                BackgroundGrace.run { await model.deactivate() }
             default: break
             }
         }

@@ -46,7 +46,7 @@ final class HabitListModel: ObservableObject {
         guard !started else { return }
         started = true
         ChangeSignal.observe { [weak self] in
-            Task { @MainActor in await self?.refresh() }
+            Task { @MainActor in await self?.handleExternalChange() }
         }
         NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
@@ -94,6 +94,21 @@ final class HabitListModel: ObservableObject {
         }
     }
 
+    /// A change signal arrived. Our own writes are already in the open kit; a write from another process
+    /// (widget, intent) needs a reload first. Only while active, so the DB is never reopened in the background.
+    private func handleExternalChange() async {
+        guard isActive else { return }
+        if !ChangeSignal.isOwnPost {
+            await enqueue { [self] in
+                guard isActive else { return }
+                do { try await store.reload() } catch { report(error) }
+                await performRefresh()
+            }
+        } else {
+            await refresh()
+        }
+    }
+
     func refresh() async {
         guard isActive else { return }
         await enqueue { [self] in await performRefresh() }
@@ -134,7 +149,7 @@ final class HabitListModel: ObservableObject {
 
     private func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
         do { try await store.mutate(body) } catch { report(error) }
-        await refresh()
+        if isActive { await refresh() } else { await store.close() }
     }
 
     private func report(_ error: Error) {

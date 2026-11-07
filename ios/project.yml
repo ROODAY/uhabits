@@ -15,7 +15,11 @@ targets:
     type: application
     platform: iOS
     sources:
-      - App
+      - path: App
+        excludes:
+          - PrivacyInfo.xcprivacy
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - Shared
       - path: ../uhabits-core/assets/main/migrations
         type: folder
@@ -38,7 +42,11 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - Widgets
+      - path: Widgets
+        excludes:
+          - PrivacyInfo.xcprivacy
+      - path: Widgets/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - Shared
       - path: ../uhabits-core/assets/main/migrations
         type: folder
