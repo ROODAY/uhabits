@@ -16,6 +16,8 @@ targets:
     sources:
       - App
       - Shared
+      - path: ../uhabits-core/assets/main/migrations
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app
@@ -25,18 +27,25 @@ targets:
     dependencies:
       - target: LoopWidgets
         embed: true
+      - framework: ../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework
+        embed: false
   LoopWidgets:
     type: app-extension
     platform: iOS
     sources:
       - Widgets
       - Shared
+      - path: ../uhabits-core/assets/main/migrations
+        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app.widgets
         INFOPLIST_FILE: Widgets/Info.plist
         CODE_SIGN_ENTITLEMENTS: Widgets/LoopWidgets.entitlements
         SKIP_INSTALL: YES
+    dependencies:
+      - framework: ../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework
+        embed: false
   LoopAppTests:
     type: bundle.unit-test
     platform: iOS
@@ -44,6 +53,8 @@ targets:
       - Tests
     dependencies:
       - target: LoopApp
+      - framework: ../uhabits-ios-kit/build/XCFrameworks/release/LoopKit.xcframework
+        embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(LOOP_BUNDLE_PREFIX).app.tests
