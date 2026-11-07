@@ -230,10 +230,18 @@ struct HabitListView: View {
         guard let p = router.pending, model.loaded else { return }
         router.pending = nil
         guard let row = model.rows.first(where: { $0.id == p.habitId }) else { return }  // deleted habit
-        let cell = row.days.first(where: { $0.date == p.date })
-            ?? DayCell(date: p.date, rawValue: 0, value: 0, isCompleted: false, notes: "")
         if path.last != .detail(row.id) { path.append(.detail(row.id)) }
-        sheet = .number(row: row, cell: cell)
+        if let cell = row.days.first(where: { $0.date == p.date }) {
+            sheet = .number(row: row, cell: cell)
+            return
+        }
+        // Outside the loaded window: fetch the real cell so saving cannot overwrite value/notes.
+        Task {
+            let detail = try? await LoopStore.shared.withKit { try $0.habitDetail(habitId: row.id, historyDays: 60) }
+            if let cell = detail?.row.days.first(where: { $0.date == p.date }) {
+                sheet = .number(row: row, cell: cell)
+            }
+        }
     }
 
     private var list: some View {

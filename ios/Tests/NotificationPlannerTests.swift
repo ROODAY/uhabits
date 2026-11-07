@@ -63,6 +63,13 @@ final class NotificationPlannerTests: XCTestCase {
         XCTAssertEqual(reqs[1].content.body, "")
     }
 
+    func testShouldCloseTruthTable() {
+        XCTAssertTrue(NotificationPlanner.shouldClose(isForeground: false, closeIfInactive: true))
+        XCTAssertFalse(NotificationPlanner.shouldClose(isForeground: true, closeIfInactive: true))
+        XCTAssertFalse(NotificationPlanner.shouldClose(isForeground: false, closeIfInactive: false))
+        XCTAssertFalse(NotificationPlanner.shouldClose(isForeground: true, closeIfInactive: false))
+    }
+
     func testCleanupIdentifiers() {
         let ids = NotificationPlanner.cleanupIdentifiers(completedRows: [(id: 3, today: "2026-11-06"), (id: 9, today: "2026-11-06")])
         XCTAssertEqual(ids.pending, ["snooze-3", "snooze-9"])

@@ -35,12 +35,14 @@ struct LoopApp: App {
         .onChange(of: scenePhase, initial: true) { _, phase in
             switch phase {
             case .active:
+                AppActivity.isForeground = true
                 Task {
                     await model.activate(seedDemo: seedDemo)
                     await NotificationPlanner.requestAuthorizationIfRemindersExist()
-                    await NotificationPlanner.reschedule()
+                    await NotificationPlanner.reschedule(closeIfInactive: false)
                 }
             case .background:
+                AppActivity.isForeground = false
                 BackgroundRefresh.schedule()
                 Task { await model.deactivate() }
             default: break

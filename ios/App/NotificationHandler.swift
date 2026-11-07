@@ -49,14 +49,20 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
     private func done(habitId: Int64, date: String?, requestId: String) async {
         if let date {
             // Unknown habit ids are a facade no-op; mutate still reschedules via the hook.
-            try? await LoopStore.shared.mutate { try $0.markDone(habitId: habitId, date: date) }
+            do {
+                try await LoopStore.shared.mutate { try $0.markDone(habitId: habitId, date: date) }
+            } catch {
+                await NotificationPlanner.reschedule()  // the mutate hook did not run
+            }
         } else {
             await NotificationPlanner.reschedule()
         }
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [NotificationPlanner.snoozeIdentifier(habitId: habitId)])
         center.removeDeliveredNotifications(withIdentifiers: [requestId, NotificationPlanner.snoozeIdentifier(habitId: habitId)])
-        if await NotificationPlanner.isInactive() { await LoopStore.shared.close() }
+        if NotificationPlanner.shouldClose(isForeground: await NotificationPlanner.isForeground(), closeIfInactive: true) {
+            await LoopStore.shared.close()
+        }
     }
 
     private func snooze(habitId: Int64, content: UNNotificationContent) async {

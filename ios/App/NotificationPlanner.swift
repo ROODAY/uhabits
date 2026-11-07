@@ -3,6 +3,13 @@ import UIKit
 import UserNotifications
 import LoopKit
 
+/// Single source of truth for "UI is in use" (R-T14h). Set synchronously by the scenePhase handler;
+/// stays false on background launches (notification actions, BGTasks).
+@MainActor
+enum AppActivity {
+    static var isForeground = false
+}
+
 /// Pre-schedules concrete reminder occurrences computed by the facade (iOS cannot run code at fire time).
 /// App-only: shared intents call `reschedule()` under `#if LOOP_APP`.
 enum NotificationPlanner {
@@ -102,7 +109,7 @@ enum NotificationPlanner {
                  try kit.listHabits(dayCount: 1, includeArchived: false))
             }
         } catch {}
-        if closeIfInactive, await isInactive() { await LoopStore.shared.close() }
+        if shouldClose(isForeground: await isForeground(), closeIfInactive: closeIfInactive) { await LoopStore.shared.close() }
         guard let (occurrences, rows) = result else { return }
 
         let center = UNUserNotificationCenter.current()
@@ -119,8 +126,13 @@ enum NotificationPlanner {
         center.removeDeliveredNotifications(withIdentifiers: ids.delivered)
     }
 
-    static func isInactive() async -> Bool {
-        await MainActor.run { UIApplication.shared.applicationState != .active }
+    /// Close the store iff the app is not in the foreground and the caller asked for it (R-T14a/h).
+    static func shouldClose(isForeground: Bool, closeIfInactive: Bool) -> Bool {
+        closeIfInactive && !isForeground
+    }
+
+    static func isForeground() async -> Bool {
+        await MainActor.run { AppActivity.isForeground }
     }
 
     // MARK: Permission
