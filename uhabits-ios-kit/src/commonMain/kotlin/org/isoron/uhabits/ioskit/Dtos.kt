@@ -76,3 +76,14 @@ data class ReminderOccurrence(
     val hour: Int,
     val minute: Int
 )
+
+/** firstWeekdayChoice: -1 = system, 1..7 = Sun..Sat. resolvedFirstWeekday is always 1..7. */
+data class AppSettings(
+    val shortToggle: Boolean,
+    val midnightDelay: Boolean,
+    val skipEnabled: Boolean,
+    val questionMarksEnabled: Boolean,
+    val reverseCheckmarks: Boolean,
+    val firstWeekdayChoice: Int,
+    val resolvedFirstWeekday: Int
+)

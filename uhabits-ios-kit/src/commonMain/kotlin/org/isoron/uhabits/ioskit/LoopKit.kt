@@ -52,7 +52,7 @@ class LoopKit @Throws(Exception::class) constructor(
     private val databaseOpener: DatabaseOpener,
     private val fileOpener: FileOpener,
     private val dbPath: String,
-    private val store: KeyValueStore,
+    internal val store: KeyValueStore,
     private val todaySource: TodaySource = TodaySource { computeToday(it, 0) }
 ) {
     private var database: Database? = null
@@ -228,6 +228,52 @@ class LoopKit @Throws(Exception::class) constructor(
     fun areQuestionMarksEnabled(): Boolean {
         refreshToday()
         return prefs.areQuestionMarksEnabled
+    }
+
+    @Throws(Exception::class)
+    fun settings(): AppSettings {
+        refreshToday()
+        return readSettings(prefs, store)
+    }
+
+    @Throws(Exception::class)
+    fun setShortToggle(enabled: Boolean) {
+        refreshToday()
+        prefs.isShortToggleEnabled = enabled
+    }
+
+    @Throws(Exception::class)
+    fun setMidnightDelay(enabled: Boolean) {
+        refreshToday()
+        prefs.isMidnightDelayEnabled = enabled
+        lastToday = null
+    }
+
+    @Throws(Exception::class)
+    fun setSkipEnabled(enabled: Boolean) {
+        refreshToday()
+        prefs.isSkipEnabled = enabled
+    }
+
+    @Throws(Exception::class)
+    fun setQuestionMarksEnabled(enabled: Boolean) {
+        refreshToday()
+        prefs.areQuestionMarksEnabled = enabled
+    }
+
+    @Throws(Exception::class)
+    fun setReverseCheckmarks(enabled: Boolean) {
+        refreshToday()
+        prefs.isCheckmarkSequenceReversed = enabled
+    }
+
+    /** [choice]: -1 = system default, 1..7 = Sunday..Saturday. */
+    @Throws(Exception::class)
+    fun setFirstWeekday(choice: Int) {
+        refreshToday()
+        writeFirstWeekday(store, choice)
+        lastToday = null
+        refreshToday()
     }
 
     private fun mutate(habitId: Long, date: String, requireNumerical: Boolean?, block: (Habit, LocalDate) -> Unit) {
