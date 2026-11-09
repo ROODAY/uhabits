@@ -3,6 +3,8 @@ import LoopKit
 
 struct SettingsView: View {
     var onChanged: () -> Void
+    /// Mirrors HabitDetailView: false while the app is in the background, so the DB is closed again.
+    var isActive: @MainActor () -> Bool = { true }
 
     @Environment(\.openURL) private var openURL
     @State private var settings: AppSettings?
@@ -17,6 +19,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Group {
             Section("Interface") {
                 toggle("Toggle with short press", \.shortToggle) { try $0.setShortToggle(enabled: $1) }
                 toggle("Day ends at 3 AM", \.midnightDelay) { try $0.setMidnightDelay(enabled: $1) }
@@ -37,16 +40,17 @@ struct SettingsView: View {
                     if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
                 }
             }
+            }
+            .disabled(settings == nil)
             Section {
-                Button("Export full backup") {}
-                Button("Export as CSV") {}
-                Button("Import data") {}
+                Button("Export full backup") {}.disabled(true)
+                Button("Export as CSV") {}.disabled(true)
+                Button("Import data") {}.disabled(true)
             } header: {
                 Text("Database")
             } footer: {
                 Text("Coming soon")
             }
-            .disabled(true)
             Section("About") {
                 LabeledContent("Version", value: version)
                 if let url = URL(string: "https://github.com/ROODAY/uhabits") {
@@ -71,15 +75,22 @@ struct SettingsView: View {
     }
 
     private func reload() async {
+        guard isActive() else { return }
         do { settings = try await LoopStore.shared.withKit { try $0.settings() } }
         catch { errorMessage = String(describing: error) }
     }
 
     private func write(_ body: @escaping (LoopKit) throws -> Void) {
         Task {
-            do { try await LoopStore.shared.mutate(body) } catch { errorMessage = String(describing: error) }
-            await reload()
-            onChanged()
+            var ok = true
+            do { try await LoopStore.shared.mutate(body) } catch { ok = false; errorMessage = String(describing: error) }
+            // The mutate may have (re)opened the DB after the app went to the background: close it again.
+            if isActive() {
+                await reload()
+                if ok { onChanged() }
+            } else {
+                await LoopStore.shared.close()
+            }
         }
     }
 }

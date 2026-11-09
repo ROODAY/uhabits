@@ -217,7 +217,8 @@ struct HabitListView: View {
                 case .detail(let id):
                     HabitDetailView(habitId: id, listModel: model, onEdit: { path.append(.edit($0)) })
                 case .settings:
-                    SettingsView(onChanged: { Task { await model.refresh() } })
+                    SettingsView(onChanged: { Task { await model.refresh() } },
+                                 isActive: { [weak model] in model?.isActive ?? false })
                 }
             }
         }
