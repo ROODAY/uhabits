@@ -1,11 +1,15 @@
 package org.isoron.uhabits.ioskit
 
+import org.isoron.platform.time.LocalDate
+import org.isoron.uhabits.core.models.Entry
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
+private val TODAY = LocalDate(2015, 1, 25) // testKit default today
 
 class ListRowsTest {
     private fun input(
@@ -60,11 +64,13 @@ class ListRowsTest {
         val (kit, _) = newKit()
         val a = kit.createHabit(input("A"))
         val b = kit.createHabit(input("B"))
+        val c = kit.createHabit(input("C"))
         kit.markDone(a, kit.today())
-        assertEquals(listOf("h:$a", "h:$b"), keys(kit))
+        kit.habitList.getById(c)!!.originalEntries.add(Entry(TODAY, Entry.NO, ""))
+        assertEquals(listOf("h:$a", "h:$b", "h:$c"), keys(kit))
         kit.setHideCompleted(true)
         assertTrue(kit.listOptions().hideCompleted)
-        assertEquals(listOf("h:$b"), keys(kit))
+        assertEquals(listOf("h:$b", "h:$c"), keys(kit))
         kit.close()
     }
 
@@ -79,8 +85,8 @@ class ListRowsTest {
         kit.toggle(a, kit.today())
         kit.toggle(a, kit.today())
         assertEquals(
-            org.isoron.uhabits.core.models.Entry.NO,
-            kit.habitList.getById(a)!!.originalEntries.get(org.isoron.platform.time.LocalDate(2015, 1, 25)).value
+            Entry.NO,
+            kit.habitList.getById(a)!!.originalEntries.get(TODAY).value
         )
         kit.markDone(c, kit.today())
         kit.setHideCompleted(true)
