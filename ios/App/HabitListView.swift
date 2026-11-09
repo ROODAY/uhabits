@@ -5,6 +5,7 @@ import LoopKit
 enum Route: Hashable {
     case edit(Int64?)
     case detail(Int64)
+    case settings
 }
 
 enum ListSheet: Identifiable {
@@ -200,6 +201,10 @@ struct HabitListView: View {
             }
             .navigationTitle("Habits")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { path.append(.settings) } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { path.append(.edit(nil)) } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Add habit")
@@ -211,11 +216,19 @@ struct HabitListView: View {
                     HabitEditView(habitId: id, onDone: { Task { await model.refresh() } })
                 case .detail(let id):
                     HabitDetailView(habitId: id, listModel: model, onEdit: { path.append(.edit($0)) })
+                case .settings:
+                    SettingsView(onChanged: { Task { await model.refresh() } })
                 }
             }
         }
         .onChange(of: model.loaded, initial: true) { _, isLoaded in
-            guard isLoaded, !launchHandled, launchScreen == "edit" || launchScreen == "detail", let first = model.rows.first else { return }
+            guard isLoaded, !launchHandled else { return }
+            if launchScreen == "settings" {
+                launchHandled = true
+                path.append(.settings)
+                return
+            }
+            guard launchScreen == "edit" || launchScreen == "detail", let first = model.rows.first else { return }
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
         }
