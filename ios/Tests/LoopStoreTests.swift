@@ -18,7 +18,7 @@ final class LoopStoreTests: XCTestCase {
     private func input(_ name: String) -> HabitInput {
         HabitInput(name: name, question: "", description: "", colorIndex: 3, isNumerical: false,
                    unit: "", targetValue: 0, targetType: 0, freqNumerator: 1, freqDenominator: 1,
-                   reminder: nil)
+                   reminder: nil, category: "")
     }
 
     private func defaults() -> UserDefaults {

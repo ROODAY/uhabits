@@ -26,7 +26,7 @@ class UpcomingRemindersTest {
         name = name, question = "Did $name?", description = "", colorIndex = 3,
         isNumerical = numerical, unit = if (numerical) "x" else "", targetValue = if (numerical) 5.0 else 0.0,
         targetType = targetType, freqNumerator = 1, freqDenominator = 1,
-        reminder = if (withReminder) ReminderDto(hour, minute, days) else null
+        reminder = if (withReminder) ReminderDto(hour, minute, days) else null, category = ""
     )
 
     @Test
@@ -140,7 +140,7 @@ class UpcomingRemindersTest {
         name = "P", question = "Did P?", description = "", colorIndex = 3,
         isNumerical = numerical, unit = if (numerical) "km" else "", targetValue = if (numerical) 20.0 else 0.0,
         targetType = 0, freqNumerator = num, freqDenominator = den,
-        reminder = ReminderDto(9, 0, List(7) { true })
+        reminder = ReminderDto(9, 0, List(7) { true }), category = ""
     )
 
     @Test

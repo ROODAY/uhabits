@@ -11,6 +11,8 @@ struct HabitEditView: View {
     @State private var name = ""
     @State private var question = ""
     @State private var notes = ""
+    /// Carried through so editing a habit keeps its category; the picker arrives in a later task.
+    @State private var category = ""
     @State private var isNumerical = false
     @State private var unit = ""
     @State private var targetText = ""
@@ -120,6 +122,7 @@ struct HabitEditView: View {
 
     private func apply(_ h: HabitInput) {
         name = h.name
+        category = h.category
         question = h.question
         notes = h.description_
         colorIndex = Int(h.colorIndex)
@@ -161,7 +164,8 @@ struct HabitEditView: View {
         return HabitInput(name: name, question: question, description: notes,
                           colorIndex: Int32(colorIndex), isNumerical: isNumerical,
                           unit: unit, targetValue: target, targetType: targetType,
-                          freqNumerator: Int32(n), freqDenominator: Int32(d), reminder: reminder)
+                          freqNumerator: Int32(n), freqDenominator: Int32(d), reminder: reminder,
+                          category: category)
     }
 
     private func save() async {

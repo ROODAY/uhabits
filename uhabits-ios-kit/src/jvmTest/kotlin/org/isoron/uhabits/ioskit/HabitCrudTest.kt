@@ -21,7 +21,7 @@ class HabitCrudTest {
     ) = HabitInput(
         name = name, question = "Did you run?", description = "notes", colorIndex = 5,
         isNumerical = numerical, unit = "km", targetValue = 3.5, targetType = 1,
-        freqNumerator = num, freqDenominator = den, reminder = reminder
+        freqNumerator = num, freqDenominator = den, reminder = reminder, category = ""
     )
 
     @Test

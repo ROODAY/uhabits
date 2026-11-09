@@ -9,7 +9,7 @@ final class CheckmarkWidgetTests: XCTestCase {
         HabitRow(id: 7, name: numerical ? "Water" : "Meditate", question: "q", colorIndex: 2,
                  isNumerical: numerical, unit: numerical ? "glasses" : "", targetValue: numerical ? 8 : 0,
                  targetType: 0, isArchived: false, score: 0.62, isCompletedToday: done, today: "2026-11-06",
-                 days: [DayCell(date: "2026-11-06", rawValue: Int32(value * 1000), value: value, isCompleted: done, notes: "")])
+                 days: [DayCell(date: "2026-11-06", rawValue: Int32(value * 1000), value: value, isCompleted: done, notes: "")], category: "")
     }
 
     func testWidgetEntryForDeletedHabit() {

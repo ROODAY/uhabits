@@ -134,7 +134,8 @@ class LoopKit @Throws(Exception::class) constructor(
             score = h.scores[today].value,
             isCompletedToday = h.isCompletedOn(today),
             today = today.iso(),
-            days = days
+            days = days,
+            category = h.category
         )
     }
 
@@ -161,7 +162,8 @@ class LoopKit @Throws(Exception::class) constructor(
             freqDenominator = h.frequency.denominator,
             reminder = reminderDto(h),
             currentStreak = current?.length ?: 0,
-            bestStreaks = h.streaks.getBest(10).map { StreakDto(it.start.iso(), it.end.iso(), it.length) }
+            bestStreaks = h.streaks.getBest(10).map { StreakDto(it.start.iso(), it.end.iso(), it.length) },
+            category = h.category
         )
     }
 
@@ -201,6 +203,16 @@ class LoopKit @Throws(Exception::class) constructor(
         return result
             .sortedWith(compareBy({ it.date }, { it.hour }, { it.minute }, { it.habitId }))
             .take(maxCount)
+    }
+
+    /** Distinct non-blank categories (case-sensitive), sorted case-insensitively. */
+    @Throws(Exception::class)
+    fun categories(): List<String> {
+        refreshToday()
+        return habitList.map { it.category.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sortedWith(compareBy({ it.lowercase() }, { it }))
     }
 
     /** 20 RGB ints (0xRRGGBB) for palette indices 0..19. */
@@ -365,7 +377,8 @@ class LoopKit @Throws(Exception::class) constructor(
             targetType = h.targetType.value,
             freqNumerator = h.frequency.numerator,
             freqDenominator = h.frequency.denominator,
-            reminder = reminderDto(h)
+            reminder = reminderDto(h),
+            category = h.category
         )
     }
 
@@ -388,6 +401,7 @@ class LoopKit @Throws(Exception::class) constructor(
         h.name = input.name.trim()
         h.question = input.question.trim()
         h.description = input.description.trim()
+        h.category = input.category.trim()
         h.color = PaletteColor(input.colorIndex)
         h.frequency = Frequency(input.freqNumerator, input.freqDenominator)
         if (input.isNumerical) {

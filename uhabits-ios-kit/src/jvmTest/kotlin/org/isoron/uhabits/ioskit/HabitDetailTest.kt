@@ -16,7 +16,7 @@ class HabitDetailTest {
     private fun input() = HabitInput(
         name = "Run", question = "", description = "Every day", colorIndex = 3,
         isNumerical = false, unit = "", targetValue = 0.0, targetType = 0,
-        freqNumerator = 1, freqDenominator = 1, reminder = null
+        freqNumerator = 1, freqDenominator = 1, reminder = null, category = ""
     )
 
     /** Marks done every day whose offset (days before today) is in [offsets]. */

@@ -21,7 +21,8 @@ data class HabitRow(
     val score: Double,
     val isCompletedToday: Boolean,
     val today: String,
-    val days: List<DayCell>
+    val days: List<DayCell>,
+    val category: String
 )
 
 /** Reminder time. `days` has size 7, indexed by daysSinceSunday (0 = Sunday). */
@@ -48,7 +49,8 @@ data class HabitInput(
     val targetType: Int,
     val freqNumerator: Int,
     val freqDenominator: Int,
-    val reminder: ReminderDto?
+    val reminder: ReminderDto?,
+    val category: String
 )
 
 data class StreakDto(
@@ -64,7 +66,8 @@ data class HabitDetail(
     val freqDenominator: Int,
     val reminder: ReminderDto?,
     val currentStreak: Int,
-    val bestStreaks: List<StreakDto>
+    val bestStreaks: List<StreakDto>,
+    val category: String
 )
 
 data class ReminderOccurrence(

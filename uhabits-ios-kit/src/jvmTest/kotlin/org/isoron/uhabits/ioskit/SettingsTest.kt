@@ -89,7 +89,7 @@ class SettingsTest {
             HabitInput(
                 name = "Run", question = "", description = "", colorIndex = 1,
                 isNumerical = true, unit = "km", targetValue = 3.0, targetType = 0, // AT_LEAST,
-                freqNumerator = 1, freqDenominator = 7, reminder = null
+                freqNumerator = 1, freqDenominator = 7, reminder = null, category = ""
             )
         )
         kit.setNumber(id, "2015-01-24", 3.0, "")
@@ -117,7 +117,7 @@ class SettingsTest {
             HabitInput(
                 name = "Read", question = "", description = "", colorIndex = 1,
                 isNumerical = false, unit = "", targetValue = 0.0, targetType = 0,
-                freqNumerator = 1, freqDenominator = 1, reminder = null
+                freqNumerator = 1, freqDenominator = 1, reminder = null, category = ""
             )
         )
         val seen = (1..4).map {

@@ -15,7 +15,7 @@ enum DemoSeed {
             HabitInput(name: name, question: "", description: "", colorIndex: color,
                        isNumerical: numerical, unit: numerical ? "glasses" : "",
                        targetValue: numerical ? 8 : 0, targetType: 0,
-                       freqNumerator: 1, freqDenominator: 1, reminder: nil)
+                       freqNumerator: 1, freqDenominator: 1, reminder: nil, category: "")
         }
         let specs: [(String, Int32, Bool)] = [
             ("Meditate", 0, false), ("Exercise", 5, false), ("Read", 11, false), ("Water", 8, true),
