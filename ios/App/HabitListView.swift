@@ -21,10 +21,20 @@ enum ListSheet: Identifiable {
 
 @MainActor
 final class HabitListModel: ObservableObject {
-    @Published var rows: [HabitRow] = []
+    @Published var rows: [ListRow] = []
+    @Published var options = ListOptions(sort: 0, isReversed: false, isSortable: true, hideArchived: true, hideCompleted: false)
+    @Published var settings = AppSettings(shortToggle: true, midnightDelay: false, skipEnabled: false,
+                                          questionMarksEnabled: false, reverseCheckmarks: false,
+                                          firstWeekdayChoice: -1, resolvedFirstWeekday: 1)
+    @Published var searchQuery = "" {
+        didSet { if searchQuery != oldValue { Task { await refresh() } } }
+    }
     @Published var lightPalette: [Int] = []
     @Published var darkPalette: [Int] = []
-    @Published var questionMarks = false
+    var questionMarks: Bool { settings.questionMarksEnabled }
+
+    /// Habit rows only (headers skipped).
+    var habitRows: [HabitRow] { rows.compactMap { $0.habit } }
     @Published var openError: String?
     @Published var alertMessage: String?
     @Published var loaded = false
@@ -118,22 +128,37 @@ final class HabitListModel: ObservableObject {
     private func performRefresh() async {
         guard isActive else { return }
         do {
+            let query = searchQuery
             let r = try await store.withKit { kit in
-                (try kit.listHabits(dayCount: 5, includeArchived: false),
+                (try kit.listRows(dayCount: 5, searchQuery: query),
                  try kit.palette(dark: false).map { Int(truncating: $0) },
                  try kit.palette(dark: true).map { Int(truncating: $0) },
-                 try kit.areQuestionMarksEnabled(),
-                 Int(try kit.midnightDelayHours()))
+                 try kit.settings(),
+                 Int(try kit.midnightDelayHours()),
+                 try kit.listOptions())
             }
             rows = r.0
             lightPalette = r.1
             darkPalette = r.2
-            questionMarks = r.3
+            settings = r.3
+            options = r.5
             openError = nil
             loaded = true
             refreshTick += 1
             scheduleMidnight(delayHours: r.4)
         } catch { report(error) }
+    }
+
+    func sortBy(_ sort: Int32) async {
+        await mutate { try $0.sortBy(sort: sort) }
+    }
+
+    func setHideArchived(_ hide: Bool) async {
+        await mutate { try $0.setHideArchived(hide: hide) }
+    }
+
+    func setHideCompleted(_ hide: Bool) async {
+        await mutate { try $0.setHideCompleted(hide: hide) }
     }
 
     func toggle(_ row: HabitRow, _ cell: DayCell) async {
@@ -205,6 +230,7 @@ struct HabitListView: View {
                     Button { path.append(.settings) } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
                 }
+                ToolbarItem(placement: .primaryAction) { sortMenu }
                 ToolbarItem(placement: .primaryAction) {
                     Button { path.append(.edit(nil)) } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Add habit")
@@ -229,7 +255,7 @@ struct HabitListView: View {
                 path.append(.settings)
                 return
             }
-            guard launchScreen == "edit" || launchScreen == "detail", let first = model.rows.first else { return }
+            guard launchScreen == "edit" || launchScreen == "detail", let first = model.habitRows.first else { return }
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
         }
@@ -258,7 +284,7 @@ struct HabitListView: View {
         let router = NotificationRouter.shared
         guard let p = router.pending, model.loaded else { return }
         router.pending = nil
-        guard let row = model.rows.first(where: { $0.id == p.habitId }) else { return }  // deleted habit
+        guard let row = model.habitRows.first(where: { $0.id == p.habitId }) else { return }  // deleted habit
         if path.last != .detail(row.id) { path.append(.detail(row.id)) }
         if let cell = row.days.first(where: { $0.date == p.date }) {
             sheet = .number(row: row, cell: cell)
@@ -273,32 +299,80 @@ struct HabitListView: View {
         }
     }
 
+    private var sortMenu: some View {
+        Menu {
+            Toggle("Hide archived", isOn: Binding(get: { model.options.hideArchived },
+                                                  set: { v in Task { await model.setHideArchived(v) } }))
+            Toggle("Hide completed", isOn: Binding(get: { model.options.hideCompleted },
+                                                   set: { v in Task { await model.setHideCompleted(v) } }))
+            Menu("Sort") {
+                sortItem("Manually", LoopKitListKt.SORT_MANUAL)
+                sortItem("By name", LoopKitListKt.SORT_NAME)
+                sortItem("By color", LoopKitListKt.SORT_COLOR)
+                sortItem("By score", LoopKitListKt.SORT_SCORE)
+                sortItem("By status", LoopKitListKt.SORT_STATUS)
+            }
+        } label: { Image(systemName: "line.3.horizontal.decrease.circle") }
+            .accessibilityLabel("Filter and sort")
+    }
+
+    @ViewBuilder private func sortItem(_ title: String, _ sort: Int32) -> some View {
+        let current = model.options.sort == sort
+        Button {
+            Task { await model.sortBy(sort) }
+        } label: {
+            if current {
+                Label(title, systemImage: model.options.isReversed ? "arrow.up" : "checkmark")
+            } else {
+                Text(title)
+            }
+        }
+    }
+
+    private func cellAction(_ row: HabitRow, _ cell: DayCell, longPress: Bool) {
+        if row.isNumerical {
+            // Measurable cells open the number sheet on tap; long press edits notes.
+            sheet = longPress ? .notes(row: row, cell: cell) : .number(row: row, cell: cell)
+            return
+        }
+        switch HabitRowView.cellTapAction(shortToggle: model.settings.shortToggle, isLongPress: longPress) {
+        case .toggle: Task { await model.toggle(row, cell) }
+        case .openSheet: sheet = .notes(row: row, cell: cell)
+        }
+    }
+
     private var list: some View {
         List {
-            if let first = model.rows.first {
+            if let first = model.habitRows.first {
                 header(first.days)
                     .listRowSeparator(.hidden)
             }
-            ForEach(model.rows, id: \.id) { row in
-                HabitRowView(
-                    row: row,
-                    color: Palette.color(index: Int(row.colorIndex), in: palette),
-                    questionMarks: model.questionMarks,
-                    onOpen: { path.append(.detail(row.id)) },
-                    onCellTap: { cell in
-                        if row.isNumerical {
-                            sheet = .number(row: row, cell: cell)
-                        } else {
-                            Task { await model.toggle(row, cell) }
-                        }
-                    },
-                    onCellLongPress: { cell in sheet = .notes(row: row, cell: cell) })
+            ForEach(model.rows, id: \.key) { item in
+                if let title = item.categoryTitle {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                        .moveDisabled(true)
+                } else if let row = item.habit {
+                    HabitRowView(
+                        row: row,
+                        color: Palette.color(index: Int(row.colorIndex), in: palette),
+                        questionMarks: model.questionMarks,
+                        reversed: model.settings.reverseCheckmarks,
+                        onOpen: { path.append(.detail(row.id)) },
+                        onCellTap: { cell in cellAction(row, cell, longPress: false) },
+                        onCellLongPress: { cell in cellAction(row, cell, longPress: true) })
+                        .opacity(row.isArchived ? 0.5 : 1)
+                }
             }
         }
         .listStyle(.plain)
+        .searchable(text: $model.searchQuery)
         .overlay {
             if model.loaded && model.rows.isEmpty {
-                Text("No habits yet. Tap + to add one.").foregroundStyle(.secondary)
+                Text(model.searchQuery.isEmpty ? "No habits yet. Tap + to add one." : "No matching habits.")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -306,7 +380,7 @@ struct HabitListView: View {
     private func header(_ days: [DayCell]) -> some View {
         HStack(spacing: 6) {
             Spacer()
-            ForEach(Array(days.enumerated()), id: \.offset) { _, d in
+            ForEach(Array(HabitRowView.displayDays(days, reversed: model.settings.reverseCheckmarks).enumerated()), id: \.offset) { _, d in
                 let parts = Self.label(d.date)
                 VStack(spacing: 0) {
                     Text(parts.0).font(.system(size: 11)).foregroundStyle(.secondary)
