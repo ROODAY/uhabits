@@ -90,3 +90,18 @@ data class AppSettings(
     val firstWeekdayChoice: Int,
     val resolvedFirstWeekday: Int
 )
+
+/** One row of the flat list: either a category header or a habit. Exactly one field is non-null. */
+data class ListRow(
+    val key: String,
+    val categoryTitle: String?,
+    val habit: HabitRow?
+)
+
+data class ListOptions(
+    val sort: Int,
+    val isReversed: Boolean,
+    val isSortable: Boolean,
+    val hideArchived: Boolean,
+    val hideCompleted: Boolean
+)

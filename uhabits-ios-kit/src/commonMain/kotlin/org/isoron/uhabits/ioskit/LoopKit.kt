@@ -102,7 +102,7 @@ class LoopKit @Throws(Exception::class) constructor(
             .map { h -> buildRow(h, today, dayCount) }
     }
 
-    private fun buildRow(h: Habit, today: LocalDate, dayCount: Int): HabitRow {
+    internal fun buildRow(h: Habit, today: LocalDate, dayCount: Int): HabitRow {
         val days = (0 until maxOf(dayCount, 0)).map { i ->
             val date = today.minus(i)
             val raw = h.computedEntries.get(date).value
@@ -137,6 +137,43 @@ class LoopKit @Throws(Exception::class) constructor(
             days = days,
             category = h.category
         )
+    }
+
+    @Throws(Exception::class)
+    fun listRows(dayCount: Int, searchQuery: String): List<ListRow> {
+        val today = refreshToday()
+        val view = habitList.getFiltered(listMatcher(prefs, searchQuery))
+        view.primaryOrder = prefs.defaultPrimaryOrder
+        view.secondaryOrder = prefs.defaultSecondaryOrder
+        val habits = view.toList().filter { it.id != null }
+        return withHeaders(habits, { it.category }) { h ->
+            ListRow("h:${h.id}", null, buildRow(h, today, dayCount))
+        }
+    }
+
+    @Throws(Exception::class)
+    fun listOptions(): ListOptions {
+        refreshToday()
+        return readListOptions(prefs)
+    }
+
+    /** Selects a sort; choosing the active sort again reverses it. Throws on an unknown sort. */
+    @Throws(Exception::class)
+    fun sortBy(sort: Int) {
+        refreshToday()
+        applySortToggle(prefs, sort)
+    }
+
+    @Throws(Exception::class)
+    fun setHideArchived(hide: Boolean) {
+        refreshToday()
+        prefs.showArchived = !hide
+    }
+
+    @Throws(Exception::class)
+    fun setHideCompleted(hide: Boolean) {
+        refreshToday()
+        prefs.showCompleted = !hide
     }
 
     private fun reminderDto(h: Habit): ReminderDto? = h.reminder?.let { r ->
