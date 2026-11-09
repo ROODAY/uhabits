@@ -365,6 +365,22 @@ class LoopKit @Throws(Exception::class) constructor(
             widgetBehavior.setValue(h, d, (value * 1000).roundToInt(), notes)
         }
 
+    /**
+     * Sets an explicit entry value. Yes/no habits accept ENTRY_YES / NO / SKIP / UNKNOWN;
+     * numerical habits accept only SKIP / UNKNOWN (use [setNumber] for numbers).
+     */
+    @Throws(Exception::class)
+    fun setEntry(habitId: Long, date: String, value: Int, notes: String) =
+        mutate(habitId, date, null) { h, d ->
+            val allowed = if (h.isNumerical) {
+                listOf(ENTRY_SKIP, ENTRY_UNKNOWN)
+            } else {
+                listOf(ENTRY_YES, ENTRY_NO, ENTRY_SKIP, ENTRY_UNKNOWN)
+            }
+            require(value in allowed) { "invalid entry value $value" }
+            commandRunner.run(CreateRepetitionCommand(habitList, h, d, value, notes))
+        }
+
     @Throws(Exception::class)
     fun setNotes(habitId: Long, date: String, notes: String) =
         mutate(habitId, date, null) { h, d ->
@@ -587,3 +603,8 @@ private class NoOpNotificationTray(commandRunner: CommandRunner, prefs: Preferen
     NotificationTray(SyncTaskRunner(), commandRunner, prefs, NoOpSystemTray()) {
     override fun cancel(habit: Habit) {}
 }
+
+const val ENTRY_YES = 2
+const val ENTRY_NO = 0
+const val ENTRY_SKIP = 3
+const val ENTRY_UNKNOWN = -1
