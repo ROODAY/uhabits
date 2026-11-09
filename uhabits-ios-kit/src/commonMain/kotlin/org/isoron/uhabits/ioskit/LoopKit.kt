@@ -12,7 +12,12 @@ import org.isoron.platform.time.getFirstWeekday
 import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.DATABASE_VERSION
+import org.isoron.uhabits.core.commands.ArchiveHabitsCommand
+import org.isoron.uhabits.core.commands.ChangeHabitCategoryCommand
+import org.isoron.uhabits.core.commands.ChangeHabitColorCommand
 import org.isoron.uhabits.core.commands.CommandRunner
+import org.isoron.uhabits.core.commands.RenameCategoryCommand
+import org.isoron.uhabits.core.commands.UnarchiveHabitsCommand
 import org.isoron.uhabits.core.commands.CreateHabitCommand
 import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.commands.EditHabitCommand
@@ -396,6 +401,53 @@ class LoopKit @Throws(Exception::class) constructor(
         refreshToday()
         val habit = habitList.getById(habitId) ?: return
         commandRunner.run(DeleteHabitsCommand(habitList, listOf(habit)))
+    }
+
+    private fun resolve(ids: List<Long>): List<Habit> = ids.distinct().mapNotNull { habitList.getById(it) }
+
+    @Throws(Exception::class)
+    fun archive(ids: List<Long>) {
+        refreshToday()
+        val hs = resolve(ids)
+        if (hs.isNotEmpty()) commandRunner.run(ArchiveHabitsCommand(habitList, hs))
+    }
+
+    @Throws(Exception::class)
+    fun unarchive(ids: List<Long>) {
+        refreshToday()
+        val hs = resolve(ids)
+        if (hs.isNotEmpty()) commandRunner.run(UnarchiveHabitsCommand(habitList, hs))
+    }
+
+    /** Sets the (trimmed) category on each habit; blank clears it. */
+    @Throws(Exception::class)
+    fun setCategory(ids: List<Long>, category: String) {
+        refreshToday()
+        val hs = resolve(ids)
+        if (hs.isNotEmpty()) commandRunner.run(ChangeHabitCategoryCommand(habitList, hs, category.trim()))
+    }
+
+    /** Throws IllegalArgumentException unless [colorIndex] is in 0..19, even for an empty list. */
+    @Throws(Exception::class)
+    fun setColor(ids: List<Long>, colorIndex: Int) {
+        refreshToday()
+        require(colorIndex in 0..19) { "colorIndex out of range" }
+        val hs = resolve(ids)
+        if (hs.isNotEmpty()) commandRunner.run(ChangeHabitColorCommand(habitList, hs, PaletteColor(colorIndex)))
+    }
+
+    /** Renames a category (both names trimmed); an empty new name clears it. Merges into an existing category. */
+    @Throws(Exception::class)
+    fun renameCategory(oldName: String, newName: String) {
+        refreshToday()
+        commandRunner.run(RenameCategoryCommand(habitList, oldName.trim(), newName.trim()))
+    }
+
+    @Throws(Exception::class)
+    fun deleteHabits(ids: List<Long>) {
+        refreshToday()
+        val hs = resolve(ids)
+        if (hs.isNotEmpty()) commandRunner.run(DeleteHabitsCommand(habitList, hs))
     }
 
     /** Current values for pre-filling the edit screen, or null if the habit does not exist. */
