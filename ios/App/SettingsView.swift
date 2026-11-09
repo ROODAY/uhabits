@@ -18,11 +18,11 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Interface") {
-                toggle("Toggle with short press", \.shortToggle) { $0.setShortToggle(enabled: $1) }
-                toggle("Day ends at 3 AM", \.midnightDelay) { $0.setMidnightDelay(enabled: $1) }
-                toggle("Enable skip days", \.skipEnabled) { $0.setSkipEnabled(enabled: $1) }
-                toggle("Enable question marks", \.questionMarksEnabled) { $0.setQuestionMarksEnabled(enabled: $1) }
-                toggle("Reverse order of days", \.reverseCheckmarks) { $0.setReverseCheckmarks(enabled: $1) }
+                toggle("Toggle with short press", \.shortToggle) { try $0.setShortToggle(enabled: $1) }
+                toggle("Day ends at 3 AM", \.midnightDelay) { try $0.setMidnightDelay(enabled: $1) }
+                toggle("Enable skip days", \.skipEnabled) { try $0.setSkipEnabled(enabled: $1) }
+                toggle("Enable question marks", \.questionMarksEnabled) { try $0.setQuestionMarksEnabled(enabled: $1) }
+                toggle("Reverse order of days", \.reverseCheckmarks) { try $0.setReverseCheckmarks(enabled: $1) }
                 Picker("First day of the week", selection: Binding(
                     get: { Int(settings?.firstWeekdayChoice ?? -1) },
                     set: { choice in write { try $0.setFirstWeekday(choice: Int32(choice)) } })) {
