@@ -91,3 +91,36 @@ internal fun <T> withHeaders(
     }
     return rows
 }
+
+/** Outcome of a drop: where to put the habit, in terms of the neighbouring habit and the header above. */
+internal data class MovePlan(val refId: Long?, val placeBefore: Boolean, val category: String, val newIndex: Int)
+
+/**
+ * Port of HabitCardListAdapter.onDragEnd applied to a SwiftUI onMove (insert-before offset in the pre-removal list).
+ * [keys] are row keys ("h:<id>" / "c:<title>"). Returns null if the move is invalid or would change nothing.
+ */
+internal fun planMove(keys: List<String>, habitId: Long, fromIndex: Int, toOffset: Int, currentCategory: String): MovePlan? {
+    if (fromIndex !in keys.indices || toOffset < 0 || toOffset > keys.size) return null
+    if (keys[fromIndex] != "h:$habitId") return null
+    if (keys.count { it.startsWith("h:") } < 2) return null
+    val insertAt = if (toOffset > fromIndex) toOffset - 1 else toOffset
+    val rows = keys.toMutableList()
+    val moved = rows.removeAt(fromIndex)
+    rows.add(insertAt, moved)
+    val k = insertAt
+    var category = ""
+    for (i in (k - 1) downTo 0) {
+        if (rows[i].startsWith("c:")) {
+            category = rows[i].removePrefix("c:")
+            break
+        }
+    }
+    if (k == fromIndex && category == currentCategory) return null
+    val above = rows.getOrNull(k - 1)
+    val below = rows.getOrNull(k + 1)
+    return when {
+        above != null && above.startsWith("h:") -> MovePlan(above.removePrefix("h:").toLong(), false, category, k)
+        below != null && below.startsWith("h:") -> MovePlan(below.removePrefix("h:").toLong(), true, category, k)
+        else -> MovePlan(null, false, category, k)
+    }
+}

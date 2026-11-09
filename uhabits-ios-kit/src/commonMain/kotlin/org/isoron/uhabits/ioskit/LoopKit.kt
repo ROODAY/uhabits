@@ -16,6 +16,8 @@ import org.isoron.uhabits.core.commands.ArchiveHabitsCommand
 import org.isoron.uhabits.core.commands.ChangeHabitCategoryCommand
 import org.isoron.uhabits.core.commands.ChangeHabitColorCommand
 import org.isoron.uhabits.core.commands.CommandRunner
+import org.isoron.uhabits.core.commands.ReorderHabitCommand
+import org.isoron.uhabits.core.commands.ReorderTarget
 import org.isoron.uhabits.core.commands.RenameCategoryCommand
 import org.isoron.uhabits.core.commands.UnarchiveHabitsCommand
 import org.isoron.uhabits.core.commands.CreateHabitCommand
@@ -425,6 +427,28 @@ class LoopKit @Throws(Exception::class) constructor(
         refreshToday()
         val hs = resolve(ids)
         if (hs.isNotEmpty()) commandRunner.run(ChangeHabitCategoryCommand(habitList, hs, category.trim()))
+    }
+
+    /**
+     * Moves a habit from a drag. Indices refer to `listRows(_, searchQuery)`; [toOffset] is a SwiftUI
+     * onMove insert-before offset. Returns false, changing nothing, if the sort is not manual, a search is
+     * active, the row at [fromIndex] is not this habit (stale drag), an index is out of range, or nothing changes.
+     */
+    @Throws(Exception::class)
+    fun moveHabit(habitId: Long, fromIndex: Int, toOffset: Int, searchQuery: String): Boolean {
+        refreshToday()
+        if (!readListOptions(prefs).isSortable || searchQuery.isNotBlank()) return false
+        val habit = habitList.getById(habitId) ?: return false
+        val keys = listRows(1, searchQuery).map { it.key }
+        val plan = planMove(keys, habitId, fromIndex, toOffset, habit.category) ?: return false
+        val ref = plan.refId?.let { habitList.getById(it) }
+        val target = when {
+            ref == null -> null
+            plan.placeBefore -> ReorderTarget.Before(ref)
+            else -> ReorderTarget.After(ref)
+        }
+        commandRunner.run(ReorderHabitCommand(habitList, habit, target, plan.category))
+        return true
     }
 
     /** Throws IllegalArgumentException unless [colorIndex] is in 0..19, even for an empty list. */
