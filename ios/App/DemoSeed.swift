@@ -34,7 +34,7 @@ enum DemoSeed {
         try await store.mutate { kit in
             try kit.setSkipEnabled(enabled: true)
             try kit.setQuestionMarksEnabled(enabled: true)
-            try kit.archive(ids: [habitIds[4]])
+            try kit.archive(ids: [KotlinLong(value: habitIds[4])])
             for (dayIndex, date) in dates.enumerated() {
                 // Deterministic, varied patterns.
                 if dayIndex % 3 != 2 { try kit.toggle(habitId: habitIds[0], date: date) }
