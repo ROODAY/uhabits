@@ -10,11 +10,11 @@ enum Route: Hashable {
 
 enum ListSheet: Identifiable {
     case number(row: HabitRow, cell: DayCell)
-    case notes(row: HabitRow, cell: DayCell)
+    case entry(row: HabitRow, cell: DayCell)
     var id: String {
         switch self {
         case .number(let r, let c): return "n\(r.id)-\(c.date)"
-        case .notes(let r, let c): return "t\(r.id)-\(c.date)"
+        case .entry(let r, let c): return "e\(r.id)-\(c.date)"
         }
     }
 }
@@ -169,8 +169,8 @@ final class HabitListModel: ObservableObject {
         await mutate { try $0.setNumber(habitId: row.id, date: cell.date, value: value, notes: notes) }
     }
 
-    func setNotes(_ row: HabitRow, _ cell: DayCell, notes: String) async {
-        await mutate { try $0.setNotes(habitId: row.id, date: cell.date, notes: notes) }
+    func setEntry(_ row: HabitRow, _ cell: DayCell, value: Int32, notes: String) async {
+        await mutate { try $0.setEntry(habitId: row.id, date: cell.date, value: value, notes: notes) }
     }
 
     private func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
@@ -255,6 +255,13 @@ struct HabitListView: View {
                 path.append(.settings)
                 return
             }
+            if launchScreen == "entry" {
+                guard let row = model.habitRows.first(where: { !$0.isNumerical }),
+                      let cell = row.days.first(where: { $0.date == row.today }) ?? row.days.first else { return }
+                launchHandled = true
+                sheet = .entry(row: row, cell: cell)
+                return
+            }
             guard launchScreen == "edit" || launchScreen == "detail", let first = model.habitRows.first else { return }
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
@@ -264,12 +271,16 @@ struct HabitListView: View {
         .sheet(item: $sheet) { s in
             switch s {
             case .number(let row, let cell):
-                NumberEntrySheet(title: row.name, unit: row.unit, value: cell.value, notes: cell.notes) { v, n in
-                    Task { await model.setNumber(row, cell, value: v, notes: n) }
-                }
-            case .notes(let row, let cell):
-                NotesSheet(title: "\(row.name) — \(cell.date)", notes: cell.notes) { n in
-                    Task { await model.setNotes(row, cell, notes: n) }
+                NumberEntrySheet(title: row.name, unit: row.unit, value: cell.value, notes: cell.notes,
+                                 skipEnabled: model.settings.skipEnabled,
+                                 questionMarksEnabled: model.settings.questionMarksEnabled,
+                                 onSave: { v, n in Task { await model.setNumber(row, cell, value: v, notes: n) } },
+                                 onSetSpecial: { v, n in Task { await model.setEntry(row, cell, value: v, notes: n) } })
+            case .entry(let row, let cell):
+                EntrySheet(title: "\(row.name) — \(cell.date)", current: Int32(cell.rawValue), notes: cell.notes,
+                           skipEnabled: model.settings.skipEnabled,
+                           questionMarksEnabled: model.settings.questionMarksEnabled) { v, n in
+                    Task { await model.setEntry(row, cell, value: v, notes: n) }
                 }
             }
         }
@@ -331,13 +342,13 @@ struct HabitListView: View {
 
     private func cellAction(_ row: HabitRow, _ cell: DayCell, longPress: Bool) {
         if row.isNumerical {
-            // Measurable cells open the number sheet on tap; long press edits notes.
-            sheet = longPress ? .notes(row: row, cell: cell) : .number(row: row, cell: cell)
+            // Measurable cells open the number sheet (value, notes, Skip, ?) on tap and long press.
+            sheet = .number(row: row, cell: cell)
             return
         }
         switch HabitRowView.cellTapAction(shortToggle: model.settings.shortToggle, isLongPress: longPress) {
         case .toggle: Task { await model.toggle(row, cell) }
-        case .openSheet: sheet = .notes(row: row, cell: cell)
+        case .openSheet: sheet = .entry(row: row, cell: cell)
         }
     }
 

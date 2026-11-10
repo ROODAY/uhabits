@@ -47,9 +47,9 @@ final class HabitDetailModel: ObservableObject {
         let id = habitId
         await mutate { try $0.setNumber(habitId: id, date: cell.date, value: value, notes: notes) }
     }
-    func setNotes(_ cell: DayCell, notes: String) async {
+    func setEntry(_ cell: DayCell, value: Int32, notes: String) async {
         let id = habitId
-        await mutate { try $0.setNotes(habitId: id, date: cell.date, notes: notes) }
+        await mutate { try $0.setEntry(habitId: id, date: cell.date, value: value, notes: notes) }
     }
 }
 
@@ -97,12 +97,16 @@ struct HabitDetailView: View {
         .sheet(item: $sheet) { s in
             switch s {
             case .number(let row, let cell):
-                NumberEntrySheet(title: row.name, unit: row.unit, value: cell.value, notes: cell.notes) { v, n in
-                    Task { await model.setNumber(cell, value: v, notes: n) }
-                }
-            case .notes(let row, let cell):
-                NotesSheet(title: "\(row.name) — \(cell.date)", notes: cell.notes) { n in
-                    Task { await model.setNotes(cell, notes: n) }
+                NumberEntrySheet(title: row.name, unit: row.unit, value: cell.value, notes: cell.notes,
+                                 skipEnabled: listModel.settings.skipEnabled,
+                                 questionMarksEnabled: listModel.settings.questionMarksEnabled,
+                                 onSave: { v, n in Task { await model.setNumber(cell, value: v, notes: n) } },
+                                 onSetSpecial: { v, n in Task { await model.setEntry(cell, value: v, notes: n) } })
+            case .entry(let row, let cell):
+                EntrySheet(title: "\(row.name) — \(cell.date)", current: Int32(cell.rawValue), notes: cell.notes,
+                           skipEnabled: listModel.settings.skipEnabled,
+                           questionMarksEnabled: listModel.settings.questionMarksEnabled) { v, n in
+                    Task { await model.setEntry(cell, value: v, notes: n) }
                 }
             }
         }
@@ -126,7 +130,7 @@ struct HabitDetailView: View {
                         if row.isNumerical { sheet = .number(row: row, cell: cell) }
                         else { Task { await model.toggle(cell) } }
                     },
-                    onLongPress: { cell in sheet = .notes(row: row, cell: cell) })
+                    onLongPress: { cell in sheet = row.isNumerical ? .number(row: row, cell: cell) : .entry(row: row, cell: cell) })
                 if !noted.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes").font(.headline)
