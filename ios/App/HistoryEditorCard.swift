@@ -72,6 +72,8 @@ struct HistoryEditorCard: View {
         let completed = cell.isCompleted
         let skipped = !isNumerical && cell.rawValue == 3
         let auto = !isNumerical && cell.rawValue == 1
+        // Skipped cells are outlined, not filled, so their text must stay readable on the card background.
+        let filled = completed && !skipped
         ZStack {
             if skipped {
                 RoundedRectangle(cornerRadius: 4)
@@ -87,9 +89,9 @@ struct HistoryEditorCard: View {
                 }
                 Text(dayNumber(cell.date)).font(.system(size: 9))
             }
-            .foregroundStyle(completed ? Color.white : Color.secondary)
+            .foregroundStyle(filled ? Color.white : (skipped ? Color.primary : Color.secondary))
             if !cell.notes.isEmpty {
-                Circle().fill(completed ? Color.white : color).frame(width: 5, height: 5)
+                Circle().fill(filled ? Color.white : color).frame(width: 5, height: 5)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(2)
             }
