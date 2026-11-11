@@ -1,8 +1,9 @@
 # iOS port: handoff (2026-11-07)
 
-Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). Phases 0 and 1 are done: the whole branch was reviewed and the review's fixes are in. CI is green at `752d0b95` (workflows `ios` and `android-core`).
+Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). Phases 0, 1 and 2 are done: the whole branch was reviewed and the review's fixes are in. CI was green at `752d0b95` after phase 1 and is green after the phase 2 dark mode pass (workflows `ios` and `android-core`).
 
 - Design: `docs/superpowers/specs/2026-11-06-ios-port-design.md` (phases 0-4, process/lock model §6.3, reminders §6.4)
+- Phase 2 design: `docs/superpowers/specs/2026-11-08-ios-phase-2-design.md`
 - Phase 0-1 plan: `docs/superpowers/plans/2026-11-06-ios-port-phase-0-1.md`
 - TestFlight setup: `ios/SETUP.md`
 
@@ -14,6 +15,7 @@ Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). P
   - Habit list with check-off, plus long-press or number entry for measurable habits.
   - Create, edit and delete habits (yes/no and measurable, frequency, reminder).
   - Detail screen with an editable history grid, notes, and streaks.
+  - Phase 2: categories (section headers, rename, set from edit/detail/list), archive/unarchive, select mode with bulk actions and drag reorder, sort and hide archived/completed from the ☰ menu, search, skip and "?" marks, a settings screen (first weekday, midnight delay, short toggle, question marks, skip, reverse checkmarks, reminder defaults, notification settings link), and dark mode.
 - **Reminders:**
   - Local notifications with Done and Snooze (15 min) actions, capped at 60 pending.
   - Rescheduled on launch, on every change, on day change, by background refresh, and from widget/intent check-offs.
@@ -21,6 +23,8 @@ Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). P
 - **Shared data:** the app and widget share one SQLite DB in the App Group. The DB is closed whenever the app is not active, so iOS doesn't kill it (`0xdead10cc`).
 
 ## Next step 1: get it on her iPhone (owner only)
+TestFlight now waits until phase 4 (backup/import) is done, so she gets export and import in the first build (spec §1). The steps below can be prepared earlier (Apple account, App IDs, secrets), but don't tag until then.
+
 Follow `ios/SETUP.md` in order. In short:
 1. Pick a prefix (e.g. `com.yourname.loop`).
 2. On developer.apple.com:
@@ -44,9 +48,19 @@ If the run fails, see the troubleshooting list in SETUP.md §10. The workflow up
 - Reminders fire at the set time, and Done and Snooze work from the notification.
 - A measurable weekly habit stops reminding once its weekly target is met.
 
+Phase 2 checks (menus can't be opened in CI, so these have no screenshots):
+- Drag-reorder across categories feels right: dropping under a header takes that category, dropping at the very top makes it uncategorized.
+- The row context menu and the check-cell long-press don't conflict (long-press on a cell opens the entry sheet, long-press elsewhere on the row opens the menu).
+- Long-pressing a category header opens Rename.
+- The ☰ menu: hide archived, hide completed, and sort (the checkmark and ascending/descending arrow show the current choice).
+- Settings "Notification settings" opens the iOS Settings page for the app.
+- Dark mode on the phone: lists, detail, history grid, streaks and settings are all readable, and habit colors look right.
+- Category suggestion chips tap correctly while the text field is focused.
+- Select mode: search field behaviour (typing, clearing, and selecting while a search is active).
+
 ## Next step 2: the remaining phases (need a plan each)
 Per the design doc. Start each one with brainstorming/writing-plans against the spec.
-- **Phase 2, "probably wanted early":** categories, archive/unarchive, reorder, sort, hide completed/archived, search, skip and "?" marks (the facade already exposes `areQuestionMarksEnabled`), a settings screen (first weekday, midnight delay, question marks, reminder defaults), and dark-mode polish.
+- **Phase 2: done.** Categories, archive/unarchive, reorder, sort, hide completed/archived, search, skip and "?" marks, settings, and dark mode.
 - **Phase 3, charts and widgets:** calendar/heatmap grid, score, frequency and bar charts on the detail screen, plus the remaining widgets (history/progress, streak, score, multi-habit list).
 - **Phase 4, backup/import:** export to CSV/DB and import a Loop DB.
   - Re-enable the iOS test exclusions in `uhabits-core/build.gradle.kts`: `*ZipTest`, `*HabitsCSVExporterTest`, `ListHabitsBehaviorTest.testOnExportCSV`, `ShowHabitMenuPresenterTest.testOnExport`.
@@ -55,7 +69,6 @@ Per the design doc. Start each one with brainstorming/writing-plans against the 
 
 ## Known limits and accepted minors
 - The reminder horizon is 60 pending notifications, about 12 days of one daily reminder if the app is never opened.
-- Midnight delay has no iOS UI yet (phase 2 settings).
 - Targets are capped at 1e9 by validation.
 - When an intent runs inside the app process, reminders get rescheduled twice. Harmless.
 - Siri phrases for newly created habits may lag (no `updateAppShortcutParameters()`).

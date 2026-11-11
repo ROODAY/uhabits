@@ -347,6 +347,12 @@ struct HabitListView: View {
                 Task { sheet = .category(row: row, existing: await model.loadCategories()) }
                 return
             }
+            if launchScreen == "detail-category" {
+                guard let row = model.habitRows.first(where: { !$0.category.isEmpty }) else { return }
+                launchHandled = true
+                path.append(.detail(row.id))
+                return
+            }
             guard launchScreen == "edit" || launchScreen == "detail", let first = model.habitRows.first else { return }
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))

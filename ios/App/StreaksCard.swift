@@ -23,7 +23,7 @@ struct StreaksCard: View {
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.15))
                             RoundedRectangle(cornerRadius: 4).fill(color)
-                                .frame(width: max(8, geo.size.width * CGFloat(s.length) / CGFloat(maxLen)))
+                                .frame(width: max(24, geo.size.width * CGFloat(s.length) / CGFloat(maxLen)))
                             Text("\(s.length)").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
                                 .padding(.leading, 6)
                         }
