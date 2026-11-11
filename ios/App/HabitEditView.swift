@@ -4,6 +4,7 @@ import LoopKit
 struct HabitEditView: View {
     let habitId: Int64?
     var onDone: () -> Void = {}
+    var isActive: @MainActor () -> Bool = { true }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
@@ -140,6 +141,8 @@ struct HabitEditView: View {
             if let h = r.2 { apply(h) }
             loaded = true
         } catch { self.error = Self.message(error) }
+        // The read may have (re)opened the DB after the app went to the background: close it again.
+        if !isActive() { await LoopStore.shared.close() }
     }
 
     private func apply(_ h: HabitInput) {

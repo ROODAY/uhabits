@@ -42,7 +42,7 @@ class EntryValuesTest {
         for (v in listOf(ENTRY_YES, ENTRY_NO, ENTRY_SKIP, ENTRY_UNKNOWN)) {
             kit.setEntry(h.id!!, day, v, "n$v")
             assertEquals(v, cell(kit).rawValue)
-            if (v != ENTRY_UNKNOWN) assertEquals("n$v", cell(kit).notes)
+            assertEquals("n$v", cell(kit).notes)
         }
         kit.close()
     }

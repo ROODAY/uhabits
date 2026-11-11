@@ -54,6 +54,11 @@ final class HabitDetailModel: ObservableObject {
         let id = habitId
         await mutate { try $0.setEntry(habitId: id, date: cell.date, value: value, notes: notes) }
     }
+    /// Saves only the note, keeping the entry's raw value (e.g. YES_AUTO).
+    func setNotes(_ cell: DayCell, notes: String) async {
+        let id = habitId
+        await mutate { try $0.setNotes(habitId: id, date: cell.date, notes: notes) }
+    }
 }
 
 struct HabitDetailView: View {
@@ -120,7 +125,10 @@ struct HabitDetailView: View {
                 EntrySheet(title: "\(row.name) — \(cell.date)", current: Int32(cell.rawValue), notes: cell.notes,
                            skipEnabled: listModel.settings.skipEnabled,
                            questionMarksEnabled: listModel.settings.questionMarksEnabled) { v, n in
-                    Task { await model.setEntry(cell, value: v, notes: n) }
+                    Task {
+                        if let v { await model.setEntry(cell, value: v, notes: n) }
+                        else { await model.setNotes(cell, notes: n) }
+                    }
                 }
             case .color, .category:
                 // Only the list screen presents these (row context menu); never set on the detail screen.
@@ -144,10 +152,19 @@ struct HabitDetailView: View {
                 HistoryEditorCard(
                     days: row.days, today: row.today, firstWeekday: model.firstWeekday, isNumerical: row.isNumerical, unit: row.unit, color: color,
                     onTap: { cell in
-                        if row.isNumerical { sheet = .number(row: row, cell: cell) }
-                        else { Task { await model.toggle(cell) } }
+                        if row.isNumerical { sheet = .number(row: row, cell: cell); return }
+                        switch HabitRowView.cellTapAction(shortToggle: listModel.settings.shortToggle, isLongPress: false) {
+                        case .toggle: Task { await model.toggle(cell) }
+                        case .openSheet: sheet = .entry(row: row, cell: cell)
+                        }
                     },
-                    onLongPress: { cell in sheet = row.isNumerical ? .number(row: row, cell: cell) : .entry(row: row, cell: cell) })
+                    onLongPress: { cell in
+                        if row.isNumerical { sheet = .number(row: row, cell: cell); return }
+                        switch HabitRowView.cellTapAction(shortToggle: listModel.settings.shortToggle, isLongPress: true) {
+                        case .toggle: Task { await model.toggle(cell) }
+                        case .openSheet: sheet = .entry(row: row, cell: cell)
+                        }
+                    })
                 if !noted.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Notes").font(.headline)

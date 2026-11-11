@@ -159,6 +159,7 @@ final class HabitListModel: ObservableObject {
             darkPalette = r.2
             settings = r.3
             options = r.5
+            selection.formIntersection(Set(habitRows.map { $0.id }))
             openError = nil
             loaded = true
             refreshTick += 1
@@ -188,6 +189,11 @@ final class HabitListModel: ObservableObject {
 
     func setEntry(_ row: HabitRow, _ cell: DayCell, value: Int32, notes: String) async {
         await mutate { try $0.setEntry(habitId: row.id, date: cell.date, value: value, notes: notes) }
+    }
+
+    /// Saves only the note, keeping the entry's raw value (e.g. YES_AUTO).
+    func setNotes(_ row: HabitRow, _ cell: DayCell, notes: String) async {
+        await mutate { try $0.setNotes(habitId: row.id, date: cell.date, notes: notes) }
     }
 
     /// Selected habit rows in display order.
@@ -285,7 +291,7 @@ struct HabitListView: View {
                 ToolbarItemGroup(placement: .bottomBar) {
                     if model.isSelecting {
                         SelectModeBar(
-                            count: model.selection.count,
+                            count: model.selectedRows.count,
                             isUnarchive: HabitListModel.archiveActionIsUnarchive(selectedRows: model.selectedRows),
                             onColor: { bulkSheet = .color },
                             onCategory: {
@@ -312,7 +318,8 @@ struct HabitListView: View {
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .edit(let id):
-                    HabitEditView(habitId: id, onDone: { Task { await model.refresh() } })
+                    HabitEditView(habitId: id, onDone: { Task { await model.refresh() } },
+                                  isActive: { [weak model] in model?.isActive ?? false })
                 case .detail(let id):
                     HabitDetailView(habitId: id, listModel: model, onEdit: { path.append(.edit($0)) })
                 case .settings:
@@ -379,7 +386,10 @@ struct HabitListView: View {
                 EntrySheet(title: "\(row.name) — \(cell.date)", current: Int32(cell.rawValue), notes: cell.notes,
                            skipEnabled: model.settings.skipEnabled,
                            questionMarksEnabled: model.settings.questionMarksEnabled) { v, n in
-                    Task { await model.setEntry(row, cell, value: v, notes: n) }
+                    Task {
+                        if let v { await model.setEntry(row, cell, value: v, notes: n) }
+                        else { await model.setNotes(row, cell, notes: n) }
+                    }
                 }
             }
         }
@@ -399,7 +409,7 @@ struct HabitListView: View {
                 }
             }
         }
-        .confirmationDialog(model.selection.count == 1 ? "Delete this habit?" : "Delete \(model.selection.count) habits?",
+        .confirmationDialog(model.selectedRows.count == 1 ? "Delete this habit?" : "Delete \(model.selectedRows.count) habits?",
                             isPresented: $confirmBulkDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 let ids = model.selectedRows.map { $0.id }

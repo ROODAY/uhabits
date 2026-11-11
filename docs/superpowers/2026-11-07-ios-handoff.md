@@ -1,6 +1,6 @@
 # iOS port: handoff (2026-11-07)
 
-Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). Phases 0, 1 and 2 are done: the whole branch was reviewed and the review's fixes are in. CI was green at `752d0b95` after phase 1 and is green after the phase 2 dark mode pass (workflows `ios` and `android-core`).
+Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). Phases 0, 1 and 2 are done: the whole-branch review of phase 2 is done and its fixes are applied (phase 1's review fixes were applied earlier). CI was green at `752d0b95` after phase 1 and is green after the phase 2 dark mode pass (workflows `ios` and `android-core`).
 
 - Design: `docs/superpowers/specs/2026-11-06-ios-port-design.md` (phases 0-4, process/lock model §6.3, reminders §6.4)
 - Phase 2 design: `docs/superpowers/specs/2026-11-08-ios-phase-2-design.md`
@@ -51,7 +51,8 @@ If the run fails, see the troubleshooting list in SETUP.md §10. The workflow up
 Phase 2 checks (menus can't be opened in CI, so these have no screenshots):
 - Drag-reorder across categories feels right: dropping under a header takes that category, dropping at the very top makes it uncategorized.
 - The row context menu and the check-cell long-press don't conflict (long-press on a cell opens the entry sheet, long-press elsewhere on the row opens the menu).
-- Long-pressing a category header opens Rename.
+- Long-pressing a category header inside the list opens Rename.
+- Select mode shows drag handles, and dragging a row reorders it.
 - The ☰ menu: hide archived, hide completed, and sort (the checkmark and ascending/descending arrow show the current choice).
 - Settings "Notification settings" opens the iOS Settings page for the app.
 - Dark mode on the phone: lists, detail, history grid, streaks and settings are all readable, and habit colors look right.
