@@ -70,6 +70,10 @@ jobs:
           xcrun simctl launch "$UDID" "$BID" --seed-demo --screen entry
           sleep 20
           xcrun simctl io "$UDID" screenshot build/entry.png
+          xcrun simctl terminate "$UDID" "$BID" || true
+          xcrun simctl launch "$UDID" "$BID" --seed-demo --screen menu
+          sleep 20
+          xcrun simctl io "$UDID" screenshot build/menu.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -81,6 +85,7 @@ jobs:
             ios/build/detail.png
             ios/build/settings.png
             ios/build/entry.png
+            ios/build/menu.png
             ios/build/widget*.png
       - name: Upload xcresult on failure
         if: failure()

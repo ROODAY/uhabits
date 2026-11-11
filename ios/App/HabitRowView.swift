@@ -23,6 +23,9 @@ struct HabitRowView: View {
     var onOpen: () -> Void
     var onCellTap: (DayCell) -> Void
     var onCellLongPress: (DayCell) -> Void
+    var onMenu: (MenuAction) -> Void = { _ in }
+
+    enum MenuAction { case edit, color, category, reminder, toggleArchive, delete }
 
     enum CellAction { case toggle, openSheet }
 
@@ -47,6 +50,14 @@ struct HabitRowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onOpen)
+                .contextMenu {
+                    Button("Edit") { onMenu(.edit) }
+                    Button("Color") { onMenu(.color) }
+                    Button("Category…") { onMenu(.category) }
+                    Button("Reminder…") { onMenu(.reminder) }
+                    Button(row.isArchived ? "Unarchive" : "Archive") { onMenu(.toggleArchive) }
+                    Button("Delete", role: .destructive) { onMenu(.delete) }
+                }
             ForEach(Array(Self.displayDays(row.days, reversed: reversed).enumerated()), id: \.offset) { _, cell in
                 CheckmarkCell(cell: cell, isNumerical: row.isNumerical, unit: row.unit, color: color,
                               questionMarks: questionMarks,

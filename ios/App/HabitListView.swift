@@ -11,8 +11,12 @@ enum Route: Hashable {
 enum ListSheet: Identifiable {
     case number(row: HabitRow, cell: DayCell)
     case entry(row: HabitRow, cell: DayCell)
+    case color(row: HabitRow)
+    case category(row: HabitRow, existing: [String])
     var id: String {
         switch self {
+        case .color(let r): return "c\(r.id)"
+        case .category(let r, _): return "k\(r.id)"
         case .number(let r, let c): return "n\(r.id)-\(c.date)"
         case .entry(let r, let c): return "e\(r.id)-\(c.date)"
         }
@@ -173,7 +177,7 @@ final class HabitListModel: ObservableObject {
         await mutate { try $0.setEntry(habitId: row.id, date: cell.date, value: value, notes: notes) }
     }
 
-    private func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
+    func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
         do { try await store.mutate(body) } catch { report(error) }
         if isActive { await refresh() } else { await store.close() }
     }
@@ -206,6 +210,9 @@ struct HabitListView: View {
     @State private var sheet: ListSheet?
     @State private var path: [Route] = []
     @State private var launchHandled = false
+    @State private var deleteTarget: HabitRow?
+    @State private var renameOld: String?
+    @State private var renameText = ""
     /// Value of the --screen launch argument (CI screenshots).
     var launchScreen: String?
 
@@ -262,6 +269,12 @@ struct HabitListView: View {
                 sheet = .entry(row: row, cell: cell)
                 return
             }
+            if launchScreen == "menu" {
+                guard let row = model.habitRows.first else { return }
+                launchHandled = true
+                Task { sheet = .category(row: row, existing: await model.loadCategories()) }
+                return
+            }
             guard launchScreen == "edit" || launchScreen == "detail", let first = model.habitRows.first else { return }
             launchHandled = true
             path.append(launchScreen == "detail" ? .detail(first.id) : .edit(first.id))
@@ -276,12 +289,38 @@ struct HabitListView: View {
                                  questionMarksEnabled: model.settings.questionMarksEnabled,
                                  onSave: { v, n in Task { await model.setNumber(row, cell, value: v, notes: n) } },
                                  onSetSpecial: { v, n in Task { await model.setEntry(row, cell, value: v, notes: n) } })
+            case .color(let row):
+                ColorSheet(palette: palette, selected: Int(row.colorIndex)) { i in
+                    Task { await model.setColor(row, i) }
+                }
+            case .category(let row, let existing):
+                CategoryPicker(current: row.category, existing: existing) { c in
+                    Task { await model.setCategory(row, c) }
+                }
             case .entry(let row, let cell):
                 EntrySheet(title: "\(row.name) — \(cell.date)", current: Int32(cell.rawValue), notes: cell.notes,
                            skipEnabled: model.settings.skipEnabled,
                            questionMarksEnabled: model.settings.questionMarksEnabled) { v, n in
                     Task { await model.setEntry(row, cell, value: v, notes: n) }
                 }
+            }
+        }
+        .confirmationDialog("Delete this habit?", isPresented: Binding(get: { deleteTarget != nil },
+                                                                       set: { if !$0 { deleteTarget = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let row = deleteTarget { Task { await model.delete(row) } }
+                deleteTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        }
+        .alert("Rename category", isPresented: Binding(get: { renameOld != nil },
+                                                       set: { if !$0 { renameOld = nil } })) {
+            TextField("Category", text: $renameText)
+            Button("Cancel", role: .cancel) { renameOld = nil }
+            Button("Rename") {
+                if let old = renameOld { Task { await model.renameCategory(old, to: renameText) } }
+                renameOld = nil
             }
         }
         .alert("Error", isPresented: Binding(get: { model.alertMessage != nil },
@@ -340,6 +379,16 @@ struct HabitListView: View {
         }
     }
 
+    private func menuAction(_ row: HabitRow, _ action: HabitRowView.MenuAction) {
+        switch action {
+        case .edit, .reminder: path.append(.edit(row.id))
+        case .color: sheet = .color(row: row)
+        case .category: Task { sheet = .category(row: row, existing: await model.loadCategories()) }
+        case .toggleArchive: Task { await model.setArchived(row, !row.isArchived) }
+        case .delete: deleteTarget = row
+        }
+    }
+
     private func cellAction(_ row: HabitRow, _ cell: DayCell, longPress: Bool) {
         if row.isNumerical {
             // Measurable cells open the number sheet (value, notes, Skip, ?) on tap and long press.
@@ -365,6 +414,10 @@ struct HabitListView: View {
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
                         .moveDisabled(true)
+                        .onLongPressGesture {
+                            renameText = title
+                            renameOld = title
+                        }
                 } else if let row = item.habit {
                     HabitRowView(
                         row: row,
@@ -373,7 +426,8 @@ struct HabitListView: View {
                         reversed: model.settings.reverseCheckmarks,
                         onOpen: { path.append(.detail(row.id)) },
                         onCellTap: { cell in cellAction(row, cell, longPress: false) },
-                        onCellLongPress: { cell in cellAction(row, cell, longPress: true) })
+                        onCellLongPress: { cell in cellAction(row, cell, longPress: true) },
+                        onMenu: { menuAction(row, $0) })
                         .opacity(row.isArchived ? 0.5 : 1)
                 }
             }
