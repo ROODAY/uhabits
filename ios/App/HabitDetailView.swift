@@ -7,6 +7,7 @@ final class HabitDetailModel: ObservableObject {
     @Published var lightPalette: [Int] = []
     @Published var darkPalette: [Int] = []
     @Published var missing = false
+    @Published var firstWeekday = 1
     @Published var errorMessage: String?
     private let store: LoopStore
     let habitId: Int64
@@ -25,10 +26,12 @@ final class HabitDetailModel: ObservableObject {
             let r = try await store.withKit { kit in
                 (try kit.habitDetail(habitId: id, historyDays: 56),
                  try kit.palette(dark: false).map { Int(truncating: $0) },
-                 try kit.palette(dark: true).map { Int(truncating: $0) })
+                 try kit.palette(dark: true).map { Int(truncating: $0) },
+                 Int(try kit.settings().resolvedFirstWeekday))
             }
             lightPalette = r.1
             darkPalette = r.2
+            firstWeekday = r.3
             if let d = r.0 { detail = d; missing = false } else { missing = true }
         } catch { errorMessage = String(describing: error) }
     }
@@ -83,7 +86,18 @@ struct HabitDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { onEdit(model.habitId) }
+                Menu {
+                    Button("Edit") { onEdit(model.habitId) }
+                    if let d = model.detail {
+                        let archived = d.row.isArchived
+                        Button(archived ? "Unarchive" : "Archive") {
+                            Task {
+                                await listModel.setArchived(d.row, !archived)
+                                dismiss()
+                            }
+                        }
+                    }
+                } label: { Image(systemName: "ellipsis.circle") }
             }
         }
         .task {
@@ -128,7 +142,7 @@ struct HabitDetailView: View {
                 header(d)
                 StreaksCard(currentStreak: Int(d.currentStreak), bestStreaks: d.bestStreaks, color: color)
                 HistoryEditorCard(
-                    days: row.days, today: row.today, isNumerical: row.isNumerical, unit: row.unit, color: color,
+                    days: row.days, today: row.today, firstWeekday: model.firstWeekday, isNumerical: row.isNumerical, unit: row.unit, color: color,
                     onTap: { cell in
                         if row.isNumerical { sheet = .number(row: row, cell: cell) }
                         else { Task { await model.toggle(cell) } }
@@ -156,6 +170,7 @@ struct HabitDetailView: View {
     private func header(_ d: HabitDetail) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(d.row.name).font(.title2.bold())
+            if !d.category.isEmpty { Label(d.category, systemImage: "tag").font(.subheadline).foregroundStyle(.secondary) }
             if !d.row.question.isEmpty { Text(d.row.question).foregroundStyle(.secondary) }
             Text(FrequencyPreset.from(numerator: Int(d.freqNumerator), denominator: Int(d.freqDenominator)).label)
                 .font(.subheadline)

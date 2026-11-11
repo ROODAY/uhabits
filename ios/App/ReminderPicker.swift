@@ -1,11 +1,13 @@
 import SwiftUI
 
 /// Reminder toggle, time picker and weekday toggles. `days` is indexed by daysSinceSunday (0 = Sunday);
-/// the buttons are displayed starting from the locale's first weekday.
+/// the buttons are displayed starting from the resolved first weekday setting.
 struct ReminderPicker: View {
     @Binding var enabled: Bool
     @Binding var time: Date
     @Binding var days: [Bool]
+    /// 1 = Sunday ... 7 = Saturday, from the facade's resolved setting.
+    var firstWeekday: Int = 1
 
     /// daysSinceSunday indices in display order.
     static func displayOrder(firstWeekday: Int = Calendar.current.firstWeekday) -> [Int] {
@@ -17,7 +19,7 @@ struct ReminderPicker: View {
         if enabled {
             DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
             HStack(spacing: 6) {
-                ForEach(Self.displayOrder(), id: \.self) { idx in
+                ForEach(Self.displayOrder(firstWeekday: firstWeekday), id: \.self) { idx in
                     let on = days[idx]
                     Button { days[idx].toggle() } label: {
                         Text(Calendar.current.veryShortStandaloneWeekdaySymbols[idx])

@@ -30,6 +30,8 @@ enum HistoryGrid {
 struct HistoryEditorCard: View {
     let days: [DayCell]
     let today: String
+    /// Resolved first weekday (1 = Sunday ... 7 = Saturday) from the facade.
+    let firstWeekday: Int
     let isNumerical: Bool
     let unit: String
     let color: Color
@@ -38,13 +40,13 @@ struct HistoryEditorCard: View {
 
     var body: some View {
         let cal = Calendar.current
-        let grid = HistoryGrid.layout(days: days, firstWeekday: cal.firstWeekday, today: today, calendar: cal)
+        let grid = HistoryGrid.layout(days: days, firstWeekday: firstWeekday, today: today, calendar: cal)
         VStack(alignment: .leading, spacing: 8) {
             Text("History").font(.headline)
             Grid(horizontalSpacing: 4, verticalSpacing: 4) {
                 ForEach(0..<grid.count, id: \.self) { r in
                     GridRow {
-                        Text(cal.shortWeekdaySymbols[(cal.firstWeekday - 1 + r) % 7])
+                        Text(cal.shortWeekdaySymbols[(firstWeekday - 1 + r) % 7])
                             .font(.system(size: 10)).foregroundStyle(.secondary)
                             .frame(width: 28, alignment: .leading)
                         ForEach(0..<grid[r].count, id: \.self) { c in

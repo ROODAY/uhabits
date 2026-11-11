@@ -70,6 +70,25 @@ final class HabitEditTests: XCTestCase {
     func testReminderDisplayOrder() {
         XCTAssertEqual(ReminderPicker.displayOrder(firstWeekday: 1), [0, 1, 2, 3, 4, 5, 6])
         XCTAssertEqual(ReminderPicker.displayOrder(firstWeekday: 2), [1, 2, 3, 4, 5, 6, 0])
+        XCTAssertEqual(ReminderPicker.displayOrder(firstWeekday: 7), [6, 0, 1, 2, 3, 4, 5])
+    }
+
+    func testCategorySuggestions() {
+        let all = ["Health", "Home", "work", "Hobby", "Habits", "Hike", "Hum", "Fitness"]
+        XCTAssertEqual(HabitEditView.suggestions(typed: "h", from: all),
+                       ["Health", "Home", "Hobby", "Habits", "Hike", "Hum"])
+        XCTAssertEqual(HabitEditView.suggestions(typed: "  WO ", from: all), ["work"])
+        XCTAssertEqual(HabitEditView.suggestions(typed: "home", from: all), [])
+        XCTAssertEqual(HabitEditView.suggestions(typed: "", from: ["a", "b"]), ["a", "b"])
+    }
+
+    @MainActor
+    func testSystemFirstWeekdayMatchesCalendar() async throws {
+        let (_, store) = try makeModel()
+        let s = try await store.withKit { try $0.settings() }
+        XCTAssertEqual(s.firstWeekdayChoice, -1)
+        XCTAssertEqual(Int(s.resolvedFirstWeekday), Calendar.current.firstWeekday)
+        await store.close()
     }
 
     @MainActor

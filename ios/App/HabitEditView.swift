@@ -11,8 +11,10 @@ struct HabitEditView: View {
     @State private var name = ""
     @State private var question = ""
     @State private var notes = ""
-    /// Carried through so editing a habit keeps its category; the picker arrives in a later task.
     @State private var category = ""
+    @State private var allCategories: [String] = []
+    @State private var firstWeekday = 1
+    @FocusState private var categoryFocused: Bool
     @State private var isNumerical = false
     @State private var unit = ""
     @State private var targetText = ""
@@ -39,6 +41,24 @@ struct HabitEditView: View {
                 TextField("Name", text: $name)
                 TextField("Question (e.g. Did you meditate today?)", text: $question)
                 TextField("Notes", text: $notes, axis: .vertical)
+            }
+            Section("Category") {
+                TextField("Category", text: $category)
+                    .focused($categoryFocused)
+                if categoryFocused {
+                    let chips = Self.suggestions(typed: category, from: allCategories)
+                    if !chips.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(chips, id: \.self) { c in
+                                    Button(c) { category = c }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Section("Type") {
                 Picker("Type", selection: $isNumerical) {
@@ -68,7 +88,7 @@ struct HabitEditView: View {
                 FrequencyPicker(preset: $freq, customOption: customFreq)
             }
             Section("Reminder") {
-                ReminderPicker(enabled: $reminderOn, time: $reminderTime, days: $reminderDays)
+                ReminderPicker(enabled: $reminderOn, time: $reminderTime, days: $reminderDays, firstWeekday: firstWeekday)
                 if reminderOn && notificationsDenied {
                     Text("Notifications are off for Loop in iOS Settings").font(.caption).foregroundStyle(.secondary)
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -106,15 +126,17 @@ struct HabitEditView: View {
         guard !loaded else { return }
         let id = habitId
         do {
-            let r = try await LoopStore.shared.withKit { kit -> ([Int], [Int], HabitInput?) in
+            let r = try await LoopStore.shared.withKit { kit -> ([Int], [Int], HabitInput?, [String], Int) in
                 let light = try kit.palette(dark: false).map { Int(truncating: $0) }
                 let dark = try kit.palette(dark: true).map { Int(truncating: $0) }
                 var input: HabitInput?
                 if let id { input = try kit.habitInput(habitId: id) }
-                return (light, dark, input)
+                return (light, dark, input, try kit.categories(), Int(try kit.settings().resolvedFirstWeekday))
             }
             lightPalette = r.0
             darkPalette = r.1
+            allCategories = r.3
+            firstWeekday = r.4
             if let h = r.2 { apply(h) }
             loaded = true
         } catch { self.error = Self.message(error) }
@@ -138,6 +160,15 @@ struct HabitEditView: View {
             let d = r.days.map { $0.boolValue }
             reminderDays = d.count == 7 ? d : [Bool](repeating: true, count: 7)
         }
+    }
+
+    /// Up to 6 existing categories matching the typed prefix (case-insensitive), excluding an exact match.
+    static func suggestions(typed: String, from all: [String]) -> [String] {
+        let t = typed.trimmingCharacters(in: .whitespaces).lowercased()
+        return Array(all.filter { c in
+            let l = c.lowercased()
+            return l != t && l.hasPrefix(t)
+        }.prefix(6))
     }
 
     private static func formatTarget(_ v: Double) -> String {
