@@ -28,4 +28,18 @@ final class ListGlueTests: XCTestCase {
         XCTAssertEqual(HabitRowView.cellTapAction(shortToggle: false, isLongPress: false), .openSheet)
         XCTAssertEqual(HabitRowView.cellTapAction(shortToggle: false, isLongPress: true), .toggle)
     }
+
+    private func habit(id: Int64, archived: Bool) -> HabitRow {
+        HabitRow(id: id, name: "H", question: "q", colorIndex: 2,
+                 isNumerical: false, unit: "", targetValue: 0,
+                 targetType: 0, isArchived: archived, score: 0.5, isCompletedToday: false, today: "2026-11-06",
+                 days: [], category: "")
+    }
+
+    func testArchiveActionIsUnarchive() {
+        XCTAssertTrue(HabitListModel.archiveActionIsUnarchive(selectedRows: [habit(id: 1, archived: true), habit(id: 2, archived: true)]))
+        XCTAssertFalse(HabitListModel.archiveActionIsUnarchive(selectedRows: [habit(id: 1, archived: true), habit(id: 2, archived: false)]))
+        XCTAssertFalse(HabitListModel.archiveActionIsUnarchive(selectedRows: [habit(id: 1, archived: false)]))
+        XCTAssertFalse(HabitListModel.archiveActionIsUnarchive(selectedRows: []))
+    }
 }

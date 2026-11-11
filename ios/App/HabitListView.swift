@@ -1,6 +1,17 @@
 import SwiftUI
 import LoopKit
 
+enum BulkSheet: Identifiable {
+    case color
+    case category(current: String, existing: [String])
+    var id: String {
+        switch self {
+        case .color: return "bc"
+        case .category: return "bk"
+        }
+    }
+}
+
 /// Navigation routes. Tasks 12 and 13 replace the placeholder destinations.
 enum Route: Hashable {
     case edit(Int64?)
@@ -42,6 +53,8 @@ final class HabitListModel: ObservableObject {
     @Published var openError: String?
     @Published var alertMessage: String?
     @Published var loaded = false
+    @Published var selection: Set<Int64> = []
+    @Published var isSelecting = false
     /// Bumped after every successful refresh so open detail screens re-query.
     @Published var refreshTick = 0
 
@@ -177,6 +190,31 @@ final class HabitListModel: ObservableObject {
         await mutate { try $0.setEntry(habitId: row.id, date: cell.date, value: value, notes: notes) }
     }
 
+    /// Selected habit rows in display order.
+    var selectedRows: [HabitRow] { habitRows.filter { selection.contains($0.id) } }
+
+    func endSelecting() {
+        selection = []
+        isSelecting = false
+    }
+
+    func toggleSelected(_ id: Int64) {
+        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    }
+
+    /// Unarchive only when every selected row is archived (ListHabitsSelectionMenuBehavior.canUnarchive).
+    static func archiveActionIsUnarchive(selectedRows: [HabitRow]) -> Bool {
+        !selectedRows.isEmpty && selectedRows.allSatisfy { $0.isArchived }
+    }
+
+    /// Drag reorder: the facade does the drop math and validates staleness; refresh shows the truth either way.
+    func move(fromOffsets: IndexSet, toOffset: Int) async {
+        guard isActive, let i = fromOffsets.first, rows.indices.contains(i),
+              let id = rows[i].habit?.id else { return }
+        let query = searchQuery
+        await mutate { _ = try $0.moveHabit(habitId: id, fromIndex: Int32(i), toOffset: Int32(toOffset), searchQuery: query) }
+    }
+
     func mutate(_ body: @escaping (LoopKit) throws -> Void) async {
         do { try await store.mutate(body) } catch { report(error) }
         if isActive { await refresh() } else { await store.close() }
@@ -211,6 +249,8 @@ struct HabitListView: View {
     @State private var path: [Route] = []
     @State private var launchHandled = false
     @State private var deleteTarget: HabitRow?
+    @State private var bulkSheet: BulkSheet?
+    @State private var confirmBulkDelete = false
     @State private var renameOld: String?
     @State private var renameText = ""
     /// Value of the --screen launch argument (CI screenshots).
@@ -237,12 +277,38 @@ struct HabitListView: View {
                     Button { path.append(.settings) } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(model.isSelecting ? "Done" : "Select") {
+                        if model.isSelecting { model.endSelecting() } else { model.isSelecting = true }
+                    }
+                }
+                ToolbarItemGroup(placement: .bottomBar) {
+                    if model.isSelecting {
+                        SelectModeBar(
+                            count: model.selection.count,
+                            isUnarchive: HabitListModel.archiveActionIsUnarchive(selectedRows: model.selectedRows),
+                            onColor: { bulkSheet = .color },
+                            onCategory: {
+                                let cats = Set(model.selectedRows.map { $0.category })
+                                let current = cats.count == 1 ? (cats.first ?? "") : ""
+                                Task { bulkSheet = .category(current: current, existing: await model.loadCategories()) }
+                            },
+                            onArchive: {
+                                let ids = model.selectedRows.map { $0.id }
+                                let unarchive = HabitListModel.archiveActionIsUnarchive(selectedRows: model.selectedRows)
+                                model.endSelecting()
+                                Task { await model.setArchived(ids: ids, !unarchive) }
+                            },
+                            onDelete: { confirmBulkDelete = true })
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) { sortMenu }
                 ToolbarItem(placement: .primaryAction) {
                     Button { path.append(.edit(nil)) } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Add habit")
                 }
             }
+            .toolbar(model.isSelecting ? .visible : .hidden, for: .bottomBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .edit(let id):
@@ -267,6 +333,12 @@ struct HabitListView: View {
                       let cell = row.days.first(where: { $0.date == row.today }) ?? row.days.first else { return }
                 launchHandled = true
                 sheet = .entry(row: row, cell: cell)
+                return
+            }
+            if launchScreen == "select" {
+                launchHandled = true
+                model.isSelecting = true
+                model.selection = Set(model.habitRows.prefix(2).map { $0.id })
                 return
             }
             if launchScreen == "menu" {
@@ -304,6 +376,31 @@ struct HabitListView: View {
                     Task { await model.setEntry(row, cell, value: v, notes: n) }
                 }
             }
+        }
+        .sheet(item: $bulkSheet) { s in
+            switch s {
+            case .color:
+                ColorSheet(palette: palette, selected: -1) { i in
+                    let ids = model.selectedRows.map { $0.id }
+                    model.endSelecting()
+                    Task { await model.setColor(ids: ids, i) }
+                }
+            case .category(let current, let existing):
+                CategoryPicker(current: current, existing: existing) { c in
+                    let ids = model.selectedRows.map { $0.id }
+                    model.endSelecting()
+                    Task { await model.setCategory(ids: ids, c) }
+                }
+            }
+        }
+        .confirmationDialog(model.selection.count == 1 ? "Delete this habit?" : "Delete \(model.selection.count) habits?",
+                            isPresented: $confirmBulkDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                let ids = model.selectedRows.map { $0.id }
+                model.endSelecting()
+                Task { await model.delete(ids: ids) }
+            }
+            Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog("Delete this habit?", isPresented: Binding(get: { deleteTarget != nil },
                                                                        set: { if !$0 { deleteTarget = nil } }),
@@ -401,6 +498,18 @@ struct HabitListView: View {
         }
     }
 
+    private func habitRowView(_ row: HabitRow) -> some View {
+        HabitRowView(
+            row: row,
+            color: Palette.color(index: Int(row.colorIndex), in: palette),
+            questionMarks: model.questionMarks,
+            reversed: model.settings.reverseCheckmarks,
+            onOpen: { path.append(.detail(row.id)) },
+            onCellTap: { cell in cellAction(row, cell, longPress: false) },
+            onCellLongPress: { cell in cellAction(row, cell, longPress: true) },
+            onMenu: { menuAction(row, $0) })
+    }
+
     private var list: some View {
         List {
             if let first = model.habitRows.first {
@@ -419,19 +528,26 @@ struct HabitListView: View {
                             renameOld = title
                         }
                 } else if let row = item.habit {
-                    HabitRowView(
-                        row: row,
-                        color: Palette.color(index: Int(row.colorIndex), in: palette),
-                        questionMarks: model.questionMarks,
-                        reversed: model.settings.reverseCheckmarks,
-                        onOpen: { path.append(.detail(row.id)) },
-                        onCellTap: { cell in cellAction(row, cell, longPress: false) },
-                        onCellLongPress: { cell in cellAction(row, cell, longPress: true) },
-                        onMenu: { menuAction(row, $0) })
+                    if model.isSelecting {
+                        HStack(spacing: 8) {
+                            Image(systemName: model.selection.contains(row.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(model.selection.contains(row.id) ? Color.accentColor : Color.secondary)
+                            habitRowView(row)
+                                .allowsHitTesting(false)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.toggleSelected(row.id) }
                         .opacity(row.isArchived ? 0.5 : 1)
+                    } else {
+                        habitRowView(row)
+                            .opacity(row.isArchived ? 0.5 : 1)
+                    }
                 }
             }
+            .onMove(perform: model.options.isSortable && model.searchQuery.isEmpty
+                    ? { from, to in Task { await model.move(fromOffsets: from, toOffset: to) } } : nil)
         }
+        .environment(\.editMode, .constant(model.isSelecting ? .active : .inactive))
         .listStyle(.plain)
         .searchable(text: $model.searchQuery)
         .overlay {

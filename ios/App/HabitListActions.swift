@@ -3,29 +3,34 @@ import LoopKit
 
 /// Row context-menu actions and category rename. All writes go through the list model's mutate.
 extension HabitListModel {
-    private func boxed(_ id: Int64) -> [KotlinLong] { [KotlinLong(value: id)] }
+    private func boxed(_ ids: [Int64]) -> [KotlinLong] { ids.map { KotlinLong(value: $0) } }
 
-    func setArchived(_ row: HabitRow, _ archived: Bool) async {
-        let ids = boxed(row.id)
+    func setArchived(ids: [Int64], _ archived: Bool) async {
+        let boxedIds = boxed(ids)
         await mutate { kit in
-            if archived { try kit.archive(ids: ids) } else { try kit.unarchive(ids: ids) }
+            if archived { try kit.archive(ids: boxedIds) } else { try kit.unarchive(ids: boxedIds) }
         }
     }
 
-    func setCategory(_ row: HabitRow, _ category: String) async {
-        let ids = boxed(row.id)
-        await mutate { try $0.setCategory(ids: ids, category: category) }
+    func setCategory(ids: [Int64], _ category: String) async {
+        let boxedIds = boxed(ids)
+        await mutate { try $0.setCategory(ids: boxedIds, category: category) }
     }
 
-    func setColor(_ row: HabitRow, _ index: Int) async {
-        let ids = boxed(row.id)
-        await mutate { try $0.setColor(ids: ids, colorIndex: Int32(index)) }
+    func setColor(ids: [Int64], _ index: Int) async {
+        let boxedIds = boxed(ids)
+        await mutate { try $0.setColor(ids: boxedIds, colorIndex: Int32(index)) }
     }
 
-    func delete(_ row: HabitRow) async {
-        let ids = boxed(row.id)
-        await mutate { try $0.deleteHabits(ids: ids) }
+    func delete(ids: [Int64]) async {
+        let boxedIds = boxed(ids)
+        await mutate { try $0.deleteHabits(ids: boxedIds) }
     }
+
+    func setArchived(_ row: HabitRow, _ archived: Bool) async { await setArchived(ids: [row.id], archived) }
+    func setCategory(_ row: HabitRow, _ category: String) async { await setCategory(ids: [row.id], category) }
+    func setColor(_ row: HabitRow, _ index: Int) async { await setColor(ids: [row.id], index) }
+    func delete(_ row: HabitRow) async { await delete(ids: [row.id]) }
 
     func renameCategory(_ old: String, to new: String) async {
         await mutate { try $0.renameCategory(oldName: old, newName: new) }
