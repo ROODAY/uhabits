@@ -203,7 +203,7 @@ final class HabitListModel: ObservableObject {
     }
 
     /// Unarchive only when every selected row is archived (ListHabitsSelectionMenuBehavior.canUnarchive).
-    static func archiveActionIsUnarchive(selectedRows: [HabitRow]) -> Bool {
+    nonisolated static func archiveActionIsUnarchive(selectedRows: [HabitRow]) -> Bool {
         !selectedRows.isEmpty && selectedRows.allSatisfy { $0.isArchived }
     }
 
