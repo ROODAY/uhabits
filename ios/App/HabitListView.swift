@@ -47,7 +47,7 @@ final class HabitListModel: ObservableObject {
 
     private var midnightTimer: Timer?
     private var started = false
-    private let store: LoopStore
+    let store: LoopStore
     /// Serializes lifecycle work (R-T12a): each activate/deactivate/refresh awaits the previous one.
     private var chain: Task<Void, Never>?
     /// False while the app is in the background; refresh() is then a no-op so the DB stays closed.

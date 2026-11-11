@@ -33,7 +33,9 @@ extension HabitListModel {
 
     /// Existing categories in the order the facade returns them.
     func loadCategories() async -> [String] {
-        (try? await LoopStore.shared.withKit { try $0.categories() }) ?? []
+        let result = (try? await store.withKit { try $0.categories() }) ?? []
+        if !isActive { await store.close() }
+        return result
     }
 }
 
