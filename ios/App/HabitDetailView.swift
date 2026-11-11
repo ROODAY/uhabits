@@ -108,6 +108,9 @@ struct HabitDetailView: View {
                            questionMarksEnabled: listModel.settings.questionMarksEnabled) { v, n in
                     Task { await model.setEntry(cell, value: v, notes: n) }
                 }
+            case .color, .category:
+                // Only the list screen presents these (row context menu); never set on the detail screen.
+                EmptyView()
             }
         }
         .alert("Error", isPresented: Binding(get: { model.errorMessage != nil },
