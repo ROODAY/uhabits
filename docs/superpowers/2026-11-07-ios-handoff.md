@@ -1,11 +1,12 @@
 # iOS port: handoff (2026-11-07)
 
-Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`, not merged). Phases 0, 1 and 2 are done: the whole-branch review of phase 2 is done and its fixes are applied (phase 1's review fixes were applied earlier). CI was green at `752d0b95` after phase 1 and is green after the phase 2 dark mode pass (workflows `ios` and `android-core`).
+Branch `feature/ios-port` on `ROODAY/uhabits` (forked from `dev`; `dev` fast-forwarded to the end of phase 2 at `6ad70ade` on 2026-11-11). Phases 0, 1 and 2 are done: the whole-branch review of phase 2 is done and its fixes are applied (phase 1's review fixes were applied earlier). CI was green at `752d0b95` after phase 1 and is green after the phase 2 dark mode pass (workflows `ios` and `android-core`).
 
 - Design: `docs/superpowers/specs/2026-11-06-ios-port-design.md` (phases 0-4, process/lock model §6.3, reminders §6.4)
 - Phase 2 design: `docs/superpowers/specs/2026-11-08-ios-phase-2-design.md`
 - Phase 0-1 plan: `docs/superpowers/plans/2026-11-06-ios-port-phase-0-1.md`
 - TestFlight setup: `ios/SETUP.md`
+- Phase 3 kickoff: `docs/superpowers/2026-11-11-ios-phase-3-kickoff.md`
 
 ## What works now
 - **Kotlin side:**
